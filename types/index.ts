@@ -1,4 +1,4 @@
-export type TabType = 'path' | 'cards' | 'writing' | 'vocab';
+export type TabType = 'home' | 'path' | 'cards' | 'writing' | 'vocab';
 
 export type LexicalItem = {
   id: string;

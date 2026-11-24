@@ -1,25 +1,25 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import {
-  BookOpen,
-  Crown,
-  Droplets,
-  Flame,
-  Layers,
-  Map,
-  PenTool,
-  Sprout,
-} from 'lucide-react';
+import { BookOpen, Droplets, Home as HomeIcon, Layers, Map, PenTool } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { LexicalItem, TabType } from '@/types';
+import { HomeTab } from '@/components/home/HomeTab';
 import { PathTab } from '@/components/path/PathTab';
 import { CardsTab } from '@/components/cards/CardsTab';
 import { WritingTab } from '@/components/writing/WritingTab';
 import { VocabTab } from '@/components/vocab/VocabTab';
 
+const TABS: { id: TabType; label: string; title: string; icon: typeof Map }[] = [
+  { id: 'home', label: 'ホーム', title: 'ホーム', icon: HomeIcon },
+  { id: 'path', label: 'パス', title: '学習パス', icon: Map },
+  { id: 'cards', label: 'カード', title: 'カード', icon: Layers },
+  { id: 'writing', label: '英作文', title: '英作文', icon: PenTool },
+  { id: 'vocab', label: '単語帳', title: '単語帳', icon: BookOpen },
+];
+
 export default function Home() {
-  const [activeTab, setActiveTab] = useState<TabType>('path');
+  const [activeTab, setActiveTab] = useState<TabType>('home');
   const [streak, setStreak] = useState(5);
   const [waterCelebration, setWaterCelebration] = useState<string | null>(null);
   const [items, setItems] = useState<LexicalItem[]>([]);
@@ -57,37 +57,28 @@ export default function Home() {
       {/* 上部ステータスバー */}
       <header className="sticky top-0 z-30 bg-white/95 backdrop-blur border-b border-slate-200">
         <div className="max-w-2xl mx-auto px-4 py-3 flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2">
-            <div className="w-9 h-9 rounded-xl bg-indigo-600 text-white flex items-center justify-center font-black shadow-sm">
+          <div className="flex items-center gap-2 min-w-0">
+            <div className="w-9 h-9 shrink-0 rounded-xl bg-indigo-600 text-white flex items-center justify-center font-black shadow-sm">
               鉄
             </div>
-            <div>
-              <div className="text-xs font-bold text-slate-400">能動語彙化</div>
-              <div className="text-sm font-extrabold text-slate-800 flex items-center gap-1">
-                <Crown className="w-4 h-4 text-amber-500" />
-                142 / 2,100語
-              </div>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-orange-50 border border-orange-200 text-orange-600 font-extrabold text-sm">
-              <Flame className="w-4 h-4 fill-orange-500" />
-              <span>{streak}日</span>
-            </div>
-            <div className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-indigo-50 border border-indigo-200 text-indigo-700 font-extrabold text-sm">
-              <Sprout className="w-4 h-4" />
-              <span>DB:{items.length}語</span>
-            </div>
+            <h1 className="text-base font-black text-slate-800 truncate">
+              {TABS.find((t) => t.id === activeTab)?.title}
+            </h1>
           </div>
         </div>
       </header>
 
       <main className="max-w-2xl mx-auto px-4 pt-4">
-        {activeTab === 'path' && (
-          <PathTab
+        {activeTab === 'home' && (
+          <HomeTab
             streak={streak}
             onChangeStreak={setStreak}
+            dbItemCount={items.length}
+            onNavigate={setActiveTab}
+          />
+        )}
+        {activeTab === 'path' && (
+          <PathTab
             onOpenVocab={() => setActiveTab('vocab')}
             onCelebrate={triggerCelebration}
           />
@@ -98,19 +89,15 @@ export default function Home() {
       </main>
 
       <nav className="fixed bottom-0 inset-x-0 z-40 bg-white border-t-2 border-slate-200">
-        <div className="max-w-2xl mx-auto grid grid-cols-4 h-16">
-          {[
-            { id: 'path', label: 'パス', icon: Map },
-            { id: 'cards', label: 'カード', icon: Layers },
-            { id: 'writing', label: '英作文', icon: PenTool },
-            { id: 'vocab', label: '単語帳', icon: BookOpen },
-          ].map((tab) => {
+        <div className="max-w-2xl mx-auto grid grid-cols-5 h-16">
+          {TABS.map((tab) => {
             const Icon = tab.icon;
             const active = activeTab === tab.id;
             return (
               <button
                 key={tab.id}
-                onClick={() => setActiveTab(tab.id as TabType)}
+                onClick={() => setActiveTab(tab.id)}
+                aria-current={active ? 'page' : undefined}
                 className={`flex flex-col items-center justify-center gap-1 transition ${
                   active ? 'text-indigo-600 font-extrabold' : 'text-slate-400 font-bold'
                 }`}

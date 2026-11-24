@@ -13,7 +13,6 @@ import {
   Zap,
 } from 'lucide-react';
 import { PathNode, SectionData } from '@/types';
-import { PlantAvatar } from './PlantAvatar';
 
 const SECTIONS: SectionData[] = [
   {
@@ -84,18 +83,11 @@ function generateSnakeOffsets(count: number): number[] {
 }
 
 type PathTabProps = {
-  streak: number;
-  onChangeStreak: (days: number) => void;
   onOpenVocab: () => void;
   onCelebrate: (message: string) => void;
 };
 
-export function PathTab({
-  streak,
-  onChangeStreak,
-  onOpenVocab,
-  onCelebrate,
-}: PathTabProps) {
+export function PathTab({ onOpenVocab, onCelebrate }: PathTabProps) {
   const [selectedSectionId, setSelectedSectionId] = useState('sec2');
   const [sectionProgress, setSectionProgress] = useState<Record<string, number>>({
     sec1: 8,
@@ -139,26 +131,6 @@ export function PathTab({
   return (
     <>
       <div className="space-y-5 animate-pop-in">
-        <div className="bg-white p-4 rounded-2xl border-2 border-slate-200 shadow-sm flex flex-wrap items-center justify-between gap-3">
-          <PlantAvatar streak={streak} />
-          <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl">
-            <span className="text-[10px] font-bold text-slate-500 px-1.5">成長テスト:</span>
-            {[0, 1, 5, 10, 14].map((d) => (
-              <button
-                key={d}
-                onClick={() => onChangeStreak(d)}
-                className={`text-xs font-bold px-2 py-1 rounded-lg transition ${
-                  streak === d
-                    ? 'bg-emerald-600 text-white shadow-sm'
-                    : 'text-slate-600 hover:bg-white'
-                }`}
-              >
-                {d}日
-              </button>
-            ))}
-          </div>
-        </div>
-
         {/* Section 切り替えトグル */}
         <div>
           <div className="text-xs font-bold text-slate-500 mb-2 flex items-center justify-between">
