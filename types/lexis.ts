@@ -1,4 +1,4 @@
-export type TabType = 'path' | 'cards' | 'writing' | 'vocab';
+export type TabType = 'home' | 'path' | 'cards' | 'writing' | 'vocab';
 
 export type LexicalItem = {
   id: string;
@@ -14,13 +14,22 @@ export type SectionData = {
   id: string;
   code: string;
   title: string;
-  colorBg: string;
-  colorBorder: string;
+  subtitle: string;
 };
 
-export type PathNode = {
+export type NodeIconType =
+  | 'book'
+  | 'layers'
+  | 'headphones'
+  | 'mic'
+  | 'pen'
+  | 'zap'
+  | 'crown';
+
+export type NodeItem = {
   step: number;
   label: string;
-  icon: string;
+  sub: string;
+  icon: NodeIconType;
   desc: string;
 };

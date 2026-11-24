@@ -1,129 +1,104 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import {
-  BookOpen,
-  Crown,
-  Droplets,
-  Flame,
-  Layers,
-  Map,
-  PenTool,
-  Sprout,
-} from 'lucide-react';
-import { supabase } from '@/lib/supabase';
-import { LexicalItem, TabType } from '@/types';
-import { PathTab } from '@/components/path/PathTab';
-import { CardsTab } from '@/components/cards/CardsTab';
-import { WritingTab } from '@/components/writing/WritingTab';
-import { VocabTab } from '@/components/vocab/VocabTab';
+import { useState } from 'react';
+import { CheckCircle2 } from 'lucide-react';
+import { BottomNav } from '@/components/layout/BottomNav';
+import { Header } from '@/components/layout/Header';
+import { CardsTab } from '@/components/tabs/CardsTab';
+import { HomeTab } from '@/components/tabs/HomeTab';
+import { PathTab } from '@/components/tabs/PathTab';
+import { VocabTab } from '@/components/tabs/VocabTab';
+import { WritingTab } from '@/components/tabs/WritingTab';
+import { SECTIONS } from '@/constants/curriculum';
+import type { NodeItem, TabType } from '@/types/lexis';
 
 export default function Home() {
-  const [activeTab, setActiveTab] = useState<TabType>('path');
+  const [activeTab, setActiveTab] = useState<TabType>('home');
+  const [plantDays, setPlantDays] = useState(180);
   const [streak, setStreak] = useState(5);
+  const [isWateredToday, setIsWateredToday] = useState(false);
+
+  const [selectedSectionId, setSelectedSectionId] = useState('sec2');
+  const [sectionProgress, setSectionProgress] = useState<Record<string, number>>({
+    sec1: 8,
+    sec2: 2,
+    sec3: 1,
+    sec4: 0,
+  });
   const [waterCelebration, setWaterCelebration] = useState<string | null>(null);
-  const [items, setItems] = useState<LexicalItem[]>([]);
 
-  const fetchItems = async () => {
-    const { data, error } = await supabase
-      .from('lexical_items')
-      .select('*')
-      .order('created_at', { ascending: false })
-      .limit(50);
+  const currentSection = SECTIONS.find((s) => s.id === selectedSectionId) || SECTIONS[0];
+  const doneCount = sectionProgress[selectedSectionId] ?? 0;
 
-    if (!error && data) {
-      setItems(data);
-    }
-  };
-
-  useEffect(() => {
-    fetchItems();
-  }, []);
-
-  const triggerCelebration = (msg: string) => {
-    setWaterCelebration(msg);
+  const triggerToast = (text: string) => {
+    setWaterCelebration(text);
     setTimeout(() => setWaterCelebration(null), 2800);
   };
 
+  const handleWaterPlant = () => {
+    setPlantDays((d) => d + 1);
+    if (!isWateredToday) {
+      setStreak((s) => s + 1);
+      setIsWateredToday(true);
+    }
+    triggerToast('学習を完了し、植物へ水やりを行いました (+1 Day)');
+  };
+
+  const handleCompleteNodeDemo = (node: NodeItem) => {
+    const currentDone = sectionProgress[selectedSectionId] ?? 0;
+    if (node.step > currentDone) {
+      setSectionProgress((prev) => ({
+        ...prev,
+        [selectedSectionId]: node.step,
+      }));
+    }
+    setPlantDays((d) => d + 1);
+    setIsWateredToday(true);
+    triggerToast(`「${node.label}」を完了しました (+1 Day)`);
+  };
+
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 pb-24">
+    <div className="min-h-screen bg-[#F8F9FB] text-slate-900 pb-24">
       {waterCelebration && (
-        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 bg-emerald-600 text-white px-5 py-3 rounded-2xl shadow-xl font-bold text-sm flex items-center gap-2 animate-pop-in">
-          <Droplets className="w-5 h-5 text-sky-200 animate-bounce" />
-          {waterCelebration}
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 bg-slate-900 text-white px-4 py-2.5 rounded-xl shadow-lg text-xs font-medium flex items-center gap-2 animate-soft-pop border border-slate-700/60">
+          <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+          <span>{waterCelebration}</span>
         </div>
       )}
 
-      {/* 上部ステータスバー */}
-      <header className="sticky top-0 z-30 bg-white/95 backdrop-blur border-b border-slate-200">
-        <div className="max-w-2xl mx-auto px-4 py-3 flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2">
-            <div className="w-9 h-9 rounded-xl bg-indigo-600 text-white flex items-center justify-center font-black shadow-sm">
-              鉄
-            </div>
-            <div>
-              <div className="text-xs font-bold text-slate-400">能動語彙化</div>
-              <div className="text-sm font-extrabold text-slate-800 flex items-center gap-1">
-                <Crown className="w-4 h-4 text-amber-500" />
-                142 / 2,100語
-              </div>
-            </div>
-          </div>
+      <Header streak={streak} />
 
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-orange-50 border border-orange-200 text-orange-600 font-extrabold text-sm">
-              <Flame className="w-4 h-4 fill-orange-500" />
-              <span>{streak}日</span>
-            </div>
-            <div className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-indigo-50 border border-indigo-200 text-indigo-700 font-extrabold text-sm">
-              <Sprout className="w-4 h-4" />
-              <span>DB:{items.length}語</span>
-            </div>
-          </div>
-        </div>
-      </header>
-
-      <main className="max-w-2xl mx-auto px-4 pt-4">
-        {activeTab === 'path' && (
-          <PathTab
-            streak={streak}
-            onChangeStreak={setStreak}
-            onOpenVocab={() => setActiveTab('vocab')}
-            onCelebrate={triggerCelebration}
+      <main className="max-w-2xl mx-auto px-4 pt-5">
+        {activeTab === 'home' && (
+          <HomeTab
+            plantDays={plantDays}
+            isWateredToday={isWateredToday}
+            currentSection={currentSection}
+            doneCount={doneCount}
+            onWaterPlant={handleWaterPlant}
+            onChangePlantDays={setPlantDays}
+            onNavigateTab={setActiveTab}
           />
         )}
+
+        {activeTab === 'path' && (
+          <PathTab
+            selectedSectionId={selectedSectionId}
+            sectionProgress={sectionProgress}
+            currentSection={currentSection}
+            doneCount={doneCount}
+            onSelectSection={setSelectedSectionId}
+            onCompleteNode={handleCompleteNodeDemo}
+            onOpenVocab={() => setActiveTab('vocab')}
+          />
+        )}
+
         {activeTab === 'cards' && <CardsTab />}
         {activeTab === 'writing' && <WritingTab />}
-        {activeTab === 'vocab' && <VocabTab items={items} onRefresh={fetchItems} />}
+        {activeTab === 'vocab' && <VocabTab />}
       </main>
 
-      <nav className="fixed bottom-0 inset-x-0 z-40 bg-white border-t-2 border-slate-200">
-        <div className="max-w-2xl mx-auto grid grid-cols-4 h-16">
-          {[
-            { id: 'path', label: 'パス', icon: Map },
-            { id: 'cards', label: 'カード', icon: Layers },
-            { id: 'writing', label: '英作文', icon: PenTool },
-            { id: 'vocab', label: '単語帳', icon: BookOpen },
-          ].map((tab) => {
-            const Icon = tab.icon;
-            const active = activeTab === tab.id;
-            return (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id as TabType)}
-                className={`flex flex-col items-center justify-center gap-1 transition ${
-                  active ? 'text-indigo-600 font-extrabold' : 'text-slate-400 font-bold'
-                }`}
-              >
-                <div className={`p-1 rounded-xl ${active ? 'bg-indigo-50' : ''}`}>
-                  <Icon className="w-5 h-5" />
-                </div>
-                <span className="text-[11px]">{tab.label}</span>
-              </button>
-            );
-          })}
-        </div>
-      </nav>
+      <BottomNav activeTab={activeTab} onChangeTab={setActiveTab} />
     </div>
   );
 }
