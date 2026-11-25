@@ -1,3 +1,6 @@
+'use client';
+
+import { useEffect, useRef, useState } from 'react';
 import { BLOSSOM_NODES, CANOPY_CLUSTERS, TREE_BRANCHES } from './constants';
 import type { CanopyClusterSpec } from './types';
 import { clamp, getSeasonMeta, lerp, lerpColor } from './utils';
@@ -31,6 +34,95 @@ type ComputedBranch = {
     w: number;
   }[];
 };
+
+type SeagullAgent = {
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  dir: 1 | -1;
+  cruiseSpeed: number;
+  baseY: number;
+  flapPhase: number;
+  flapRate: number;
+  glideCooldown: number;
+  turnCooldown: number;
+  isGliding: boolean;
+  scale: number;
+  baseOpacity: number;
+  seed: number;
+};
+
+const INITIAL_SEAGULLS: SeagullAgent[] = [
+  {
+    x: 118,
+    y: 78,
+    vx: 22,
+    vy: -1.5,
+    dir: 1,
+    cruiseSpeed: 23,
+    baseY: 76,
+    flapPhase: 0.4,
+    flapRate: 10.5,
+    glideCooldown: 1.8,
+    turnCooldown: 11.5,
+    isGliding: false,
+    scale: 1.0,
+    baseOpacity: 0.72,
+    seed: 1.1,
+  },
+  {
+    x: 162,
+    y: 94,
+    vx: 19,
+    vy: 1.2,
+    dir: 1,
+    cruiseSpeed: 19,
+    baseY: 92,
+    flapPhase: 2.1,
+    flapRate: 11.4,
+    glideCooldown: 2.9,
+    turnCooldown: 15.0,
+    isGliding: true,
+    scale: 0.82,
+    baseOpacity: 0.6,
+    seed: 2.7,
+  },
+  {
+    x: 348,
+    y: 66,
+    vx: -23,
+    vy: 0.8,
+    dir: -1,
+    cruiseSpeed: 24,
+    baseY: 68,
+    flapPhase: 1.2,
+    flapRate: 9.8,
+    glideCooldown: 2.2,
+    turnCooldown: 9.5,
+    isGliding: true,
+    scale: 0.9,
+    baseOpacity: 0.66,
+    seed: 4.3,
+  },
+  {
+    x: 410,
+    y: 108,
+    vx: -17,
+    vy: -1.0,
+    dir: -1,
+    cruiseSpeed: 17,
+    baseY: 104,
+    flapPhase: 3.5,
+    flapRate: 12.1,
+    glideCooldown: 1.4,
+    turnCooldown: 13.2,
+    isGliding: false,
+    scale: 0.68,
+    baseOpacity: 0.5,
+    seed: 6.1,
+  },
+];
 
 function getTreeFoliagePalette(dayInCycle: number, toneOffset: number): FoliagePalette {
   const shiftedDay =
@@ -166,16 +258,12 @@ function computeTreeSkeleton(cd: number, isSecondGenChild = false) {
   const trunkScaleH = lerp(0.28, 1.0, Math.pow(trunkG, 0.78));
   const trunkScaleW = lerp(0.32, 1.0, Math.pow(trunkG, 1.05));
 
-  // Organic S-wave undulation while sapling grows toward sunlight, settling as wood lignifies
   const youthWave = Math.sin(trunkG * Math.PI);
   const growSway1 = Math.sin(trunkG * Math.PI * 2.5) * 7.5 * youthWave;
   const growSway2 = -Math.sin(trunkG * Math.PI * 2.1) * 6.5 * youthWave;
 
-  // Gentle age lean in deep winter
   const ageLean = cd >= 312 ? clamp((cd - 312) / 48, 0, 1) * -6.5 : 0;
-
-  // If Cycle 2+, the young shoot leans gently right at first to clear the ancestral parent trunk
-  const genClear = isSecondGenChild ? lerp(9, 3, clamp((cd - 20) / 110, 0, 1)) : 0;
+  const genClear = isSecondGenChild ? lerp(7, 0, clamp((cd - 20) / 80, 0, 1)) : 0;
 
   const p0: Point = { x: 0, y: 0 };
   const p1: Point = {
@@ -217,7 +305,6 @@ function computeTreeSkeleton(cd: number, isSecondGenChild = false) {
     const g = clamp((cd - br.appearDay) / (br.fullDay - br.appearDay), 0, 1);
     const reach = Math.pow(g, 0.84);
 
-    // Branches curl subtly outward and upward as they seek light
     const brYouth = Math.sin(g * Math.PI);
     const brWaveY = -Math.sin(g * Math.PI * 2.0) * 7.5 * brYouth;
     const brWaveX = br.side * Math.sin(g * Math.PI * 1.6) * 4.0 * brYouth;
@@ -274,33 +361,178 @@ function computeTreeSkeleton(cd: number, isSecondGenChild = false) {
   };
 }
 
+function buildSeagullPath(wingPos: number, bankSkew: number) {
+  const leftSpan = 10.5 * (1 - bankSkew * 0.16);
+  const rightSpan = 10.5 * (1 + bankSkew * 0.16);
+  const elbowLift = -2.8 + wingPos * 2.4;
+  const tipY = -0.6 + wingPos * 5.2;
+
+  return `M ${(-leftSpan).toFixed(2)} ${tipY.toFixed(2)} Q ${(-leftSpan * 0.52).toFixed(2)} ${elbowLift.toFixed(2)}, 0 0 Q ${(rightSpan * 0.52).toFixed(2)} ${elbowLift.toFixed(2)}, ${rightSpan.toFixed(2)} ${tipY.toFixed(2)}`;
+}
+
+function getRealTimeCelestialState(date: Date | null) {
+  const hours = date
+    ? date.getHours() +
+      date.getMinutes() / 60 +
+      date.getSeconds() / 3600 +
+      date.getMilliseconds() / 3600000
+    : 12;
+
+  // 06:00 -> 東(左 x=45), 12:00 -> 南中(中央 x=260, y=36), 18:00 -> 西(右 x=475)
+  const hourAngle = ((hours - 12) / 24) * Math.PI * 2;
+  const sunElevation = Math.cos(hourAngle);
+  const sunX = 260 + Math.sin(hourAngle) * 215;
+  const sunY = 164 - sunElevation * 128;
+  const sunOpacity = clamp((sunElevation + 0.14) / 0.24, 0, 1);
+
+  const moonAngle = hourAngle + Math.PI;
+  const moonElevation = -sunElevation;
+  const moonX = 260 + Math.sin(moonAngle) * 200;
+  const moonY = 164 - moonElevation * 116;
+  const moonOpacity = clamp((moonElevation - 0.02) / 0.2, 0, 0.9);
+
+  const twilightFactor = clamp(1 - Math.abs(sunElevation) / 0.24, 0, 1);
+  const nightFactor = clamp((-sunElevation - 0.04) / 0.26, 0, 1);
+
+  return {
+    sunX,
+    sunY,
+    sunOpacity,
+    moonX,
+    moonY,
+    moonOpacity,
+    twilightFactor,
+    nightFactor,
+  };
+}
+
 export function RealisticBotanicalCanvas({ days, isWateredToday }: Props) {
   const cycle = days === 0 ? 1 : Math.floor((days - 1) / 360) + 1;
   const cd = days === 0 ? 0 : ((days - 1) % 360) + 1;
   const meta = getSeasonMeta(days);
 
-  // Sun seasonal trajectory across the mountain sky
-  let sunX = 412;
-  let sunY = 66;
-  if (cd >= 1 && cd <= 125) {
-    const t = cd / 125;
-    sunX = lerp(420, 368, t);
-    sunY = lerp(78, 44, t);
-  } else if (cd > 125 && cd <= 228) {
-    const t = (cd - 125) / 103;
-    sunX = lerp(368, 396, t);
-    sunY = lerp(44, 58, t);
-  } else if (cd > 228 && cd <= 298) {
-    const t = (cd - 228) / 70;
-    sunX = lerp(396, 442, t);
-    sunY = lerp(58, 96, t);
-  } else if (cd > 298) {
-    const t = (cd - 298) / 62;
-    sunX = lerp(442, 418, t);
-    sunY = lerp(96, 118, t);
+  // 現実の時間と同期するタイマー（SSRハイドレーション対策済み）
+  const [now, setNow] = useState<Date | null>(null);
+
+  useEffect(() => {
+    setNow(new Date());
+    const timer = window.setInterval(() => {
+      setNow(new Date());
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  const { sunX, sunY, sunOpacity, moonX, moonY, moonOpacity, twilightFactor, nightFactor } =
+    getRealTimeCelestialState(now);
+
+  // カモメの自律飛行ループ（再レンダリングなしで60fps描画）
+  const gullGroupRefs = useRef<(SVGGElement | null)[]>([]);
+  const gullPathRefs = useRef<(SVGPathElement | null)[]>([]);
+  const gullsRef = useRef<SeagullAgent[]>(INITIAL_SEAGULLS.map((g) => ({ ...g })));
+
+  useEffect(() => {
+    let rafId = 0;
+    let lastTime = performance.now();
+
+    const step = (time: number) => {
+      const dt = Math.min((time - lastTime) / 1000, 0.05);
+      lastTime = time;
+      const tSec = time / 1000;
+
+      const gulls = gullsRef.current;
+      for (let i = 0; i < gulls.length; i++) {
+        const g = gulls[i];
+
+        g.turnCooldown -= dt;
+        if (g.x < 34 && g.dir === -1) {
+          g.dir = 1;
+          g.turnCooldown = 8 + ((Math.sin(tSec + g.seed) + 1) * 0.5) * 8;
+        } else if (g.x > 486 && g.dir === 1) {
+          g.dir = -1;
+          g.turnCooldown = 8 + ((Math.cos(tSec + g.seed) + 1) * 0.5) * 8;
+        } else if (g.turnCooldown <= 0) {
+          g.dir = g.dir === 1 ? -1 : 1;
+          g.turnCooldown = 9 + ((Math.sin(tSec * 1.3 + g.seed) + 1) * 0.5) * 10;
+          g.isGliding = false;
+          g.glideCooldown = 1.4;
+        }
+
+        const windDrift =
+          Math.sin(tSec * 0.42 + g.seed) * 3.2 + Math.cos(tSec * 0.19 + g.seed * 1.7) * 2.4;
+        const desiredVx = g.dir * g.cruiseSpeed + windDrift;
+        g.vx += (desiredVx - g.vx) * Math.min(1, dt * 0.9);
+
+        g.baseY = clamp(
+          g.baseY + Math.sin(tSec * 0.28 + g.seed * 2.1) * 4.2 * dt,
+          36,
+          132
+        );
+        const targetY =
+          g.baseY +
+          Math.sin(tSec * 0.85 + g.seed) * 9 +
+          Math.cos(tSec * 0.47 + g.seed * 1.4) * 6;
+        const desiredVy = (targetY - g.y) * 1.1;
+        g.vy += (desiredVy - g.vy) * Math.min(1, dt * 1.8);
+
+        g.x += g.vx * dt;
+        g.y = clamp(g.y + g.vy * dt, 26, 146);
+
+        g.glideCooldown -= dt;
+        if (g.glideCooldown <= 0) {
+          g.isGliding = !g.isGliding;
+          g.glideCooldown = g.isGliding
+            ? 2.0 + ((Math.sin(tSec + g.seed) + 1) * 0.5) * 2.5
+            : 1.4 + ((Math.cos(tSec + g.seed) + 1) * 0.5) * 1.8;
+        }
+
+        const activeFlapping = !g.isGliding || g.vy < -3.2;
+        let wingPos = -0.22;
+        if (activeFlapping) {
+          g.flapPhase += g.flapRate * dt;
+          wingPos = Math.sin(g.flapPhase) * 0.92;
+        } else {
+          const targetPhase = Math.round(g.flapPhase / (Math.PI * 2)) * Math.PI * 2 - 0.25;
+          g.flapPhase += (targetPhase - g.flapPhase) * Math.min(1, dt * 4);
+          wingPos = -0.22 + Math.sin(tSec * 2.1 + g.seed) * 0.06;
+        }
+
+        const tiltDeg = clamp(g.vy * 1.15 + (g.vx / g.cruiseSpeed) * 4, -18, 18);
+        const bankSkew = clamp(g.vx / g.cruiseSpeed, -1, 1);
+
+        const groupEl = gullGroupRefs.current[i];
+        const pathEl = gullPathRefs.current[i];
+        if (groupEl) {
+          groupEl.setAttribute(
+            'transform',
+            `translate(${g.x.toFixed(1)}, ${g.y.toFixed(1)}) rotate(${tiltDeg.toFixed(1)}) scale(${g.scale})`
+          );
+        }
+        if (pathEl) {
+          pathEl.setAttribute('d', buildSeagullPath(wingPos, bankSkew));
+        }
+      }
+
+      rafId = window.requestAnimationFrame(step);
+    };
+
+    rafId = window.requestAnimationFrame(step);
+    return () => window.cancelAnimationFrame(rafId);
+  }, []);
+
+  let skyFrom = meta.bgFrom;
+  let skyTo = meta.bgTo;
+  let activeSunColor = meta.sunColor;
+
+  if (twilightFactor > 0) {
+    skyFrom = lerpColor(skyFrom, '#94A3B8', twilightFactor * 0.35);
+    skyTo = lerpColor(skyTo, '#FDBA74', twilightFactor * 0.45);
+    activeSunColor = lerpColor(activeSunColor, '#FB923C', twilightFactor * 0.75);
+  }
+  if (nightFactor > 0) {
+    skyFrom = lerpColor(skyFrom, '#0F172A', nightFactor * 0.88);
+    skyTo = lerpColor(skyTo, '#1E3A5F', nightFactor * 0.82);
   }
 
-  // Mountain seasonal palette
   const winterSnow = cd >= 296 ? clamp((cd - 296) / 32, 0, 1) : 0;
   const autumnWarmth =
     cd >= 228 && cd <= 305
@@ -330,6 +562,14 @@ export function RealisticBotanicalCanvas({ days, isWateredToday }: Props) {
     hillDeep = lerpColor(hillDeep, '#CBD5E1', winterSnow);
   }
 
+  if (nightFactor > 0) {
+    farMountain = lerpColor(farMountain, '#1E293B', nightFactor * 0.56);
+    midMountain = lerpColor(midMountain, '#162436', nightFactor * 0.54);
+    hillTop = lerpColor(hillTop, '#1E293B', nightFactor * 0.48);
+    hillMid = lerpColor(hillMid, '#132030', nightFactor * 0.5);
+    hillDeep = lerpColor(hillDeep, '#0B1320', nightFactor * 0.52);
+  }
+
   let barkDark = '#4A3525';
   let barkLight = '#7C5A3E';
   if (cd <= 38) {
@@ -346,14 +586,16 @@ export function RealisticBotanicalCanvas({ days, isWateredToday }: Props) {
   const sproutG = clamp((cd - 1) / 22, 0, 1);
   const sproutH = lerp(8, 46, Math.pow(sproutG, 0.85));
   const sproutWave = Math.sin(sproutG * Math.PI * 2.1) * 4.5 * Math.sin(sproutG * Math.PI);
-  // Germination hook ("bud arch") at days 1..8 straightening toward sunlight
   const sproutHook = cd <= 10 ? lerp(8, 0, clamp((cd - 1) / 9, 0, 1)) : 0;
 
   const isSecondGen = cycle >= 2;
-  const treeBaseX = isSecondGen ? 268 : 260;
+  const treeBaseX = isSecondGen ? lerp(268, 260, clamp((cd - 45) / 65, 0, 1)) : 260;
 
   const skel = !isSproutPhase && days >= 1 ? computeTreeSkeleton(cd, isSecondGen) : null;
-  const oldSkel = isSecondGen ? computeTreeSkeleton(360, false) : null;
+
+  const oldTreeUpperFade = isSecondGen ? clamp(1 - (cd - 1) / 13, 0, 1) : 0;
+  const oldSkel = isSecondGen && oldTreeUpperFade > 0.02 ? computeTreeSkeleton(360, false) : null;
+  const oldStumpOpacity = isSecondGen ? clamp(1 - (cd - 42) / 33, 0, 1) : 0;
 
   const isBudStage = cd >= 125 && cd < 180;
   const budProgress = clamp((cd - 125) / 55, 0, 1);
@@ -362,6 +604,15 @@ export function RealisticBotanicalCanvas({ days, isWateredToday }: Props) {
   const berryMaturity = clamp((cd - 228) / 45, 0, 1);
 
   const swayClass = cd >= 314 ? '' : 'mountain-tree-sway';
+
+  const beamTargetX = treeBaseX;
+  const beamTargetY = 235;
+  const rayDx = beamTargetX - sunX;
+  const rayDy = beamTargetY - sunY;
+  const rayLen = Math.hypot(rayDx, rayDy) || 1;
+  const perpX = -rayDy / rayLen;
+  const perpY = rayDx / rayLen;
+  const sunbeamOpacity = sunOpacity * (cd < 305 ? 1 : 0.45);
 
   function getAnchorPoint(
     skeleton: ReturnType<typeof computeTreeSkeleton>,
@@ -394,7 +645,6 @@ export function RealisticBotanicalCanvas({ days, isWateredToday }: Props) {
 
     return (
       <g>
-        {/* Surface Roots Snaking Along Mountain Earth */}
         <path
           d={`M ${-wBase * 2.1} 3.5 C ${-wBase * 1.2} 1, ${-wBase * 1.05} -12, ${-wBase * 0.9} -32
               C ${skeleton.p1.x - wMid} ${skeleton.p1.y}, ${skeleton.p2.x - wMid * 0.8} ${skeleton.p2.y}, ${skeleton.p3.x - wFork} ${skeleton.p3.y}
@@ -407,7 +657,6 @@ export function RealisticBotanicalCanvas({ days, isWateredToday }: Props) {
           fill={trunkFill}
         />
 
-        {/* Dynamic Bark Texture */}
         <path
           d={`M -1.5 -10 Q ${skeleton.p1.x} ${skeleton.p1.y * 0.9}, ${skeleton.p2.x * 0.7} ${skeleton.p2.y * 0.88}`}
           stroke={darkStroke}
@@ -416,12 +665,11 @@ export function RealisticBotanicalCanvas({ days, isWateredToday }: Props) {
           strokeLinecap="round"
         />
 
-        {/* Living Branches & Twigs */}
         {TREE_BRANCHES.map((br) => {
           const cb = skeleton.branches[br.id];
           if (!cb) return null;
           const isUpper = br.trunkT >= 0.95;
-          const op = isUpper ? clamp(1 - upperWeatherRatio * 1.15, 0, 1) : 1;
+          const op = isUpper ? clamp(1 - upperWeatherRatio * 1.25, 0, 1) : 1;
           if (op <= 0.04) return null;
 
           return (
@@ -491,11 +739,9 @@ export function RealisticBotanicalCanvas({ days, isWateredToday }: Props) {
       const mainFill = layer === 'back' ? pal.back : layer === 'mid' ? pal.mid2 : pal.front1;
       const highlightFill = layer === 'mid' ? pal.mid1 : pal.front2;
 
-      // Withering progression before detachment (drooping, curling, thinning)
       const witherT = clamp((cd - (cluster.fallDay - 26)) / 26, 0, 1);
       const afterFall = cd - cluster.fallDay;
 
-      // After fallDay: instead of instantly vanishing, render detached leaves fluttering down!
       if (afterFall >= 0) {
         if (layer === 'back' || afterFall > 22) return null;
         return (
@@ -550,7 +796,6 @@ export function RealisticBotanicalCanvas({ days, isWateredToday }: Props) {
           )}
           {cluster.leafAngles.map((deg, idx) => {
             const rad = (deg * Math.PI) / 180;
-            // Leaves fan outward as they unfurl, then droop downward (toward +90 deg) when withering
             const droopAngle = deg + (deg > 90 && deg < 270 ? -1 : 1) * witherT * 36;
             const foldAngle = droopAngle - unfurlFold * 28;
             const lx = pos.x + Math.cos(rad) * (r * (0.76 - unfurlFold * 0.2));
@@ -589,7 +834,7 @@ export function RealisticBotanicalCanvas({ days, isWateredToday }: Props) {
     <div
       className="relative w-full rounded-2xl overflow-hidden border border-slate-200/80 transition-colors duration-700"
       style={{
-        background: `linear-gradient(180deg, ${meta.bgFrom} 0%, ${meta.bgTo} 100%)`,
+        background: `linear-gradient(180deg, ${skyFrom} 0%, ${skyTo} 100%)`,
       }}
     >
       <style>{`
@@ -618,8 +863,8 @@ export function RealisticBotanicalCanvas({ days, isWateredToday }: Props) {
           100% { transform: translate(-24px, 104px) rotate(-120deg); opacity: 0; }
         }
         @keyframes sunPulse {
-          0%, 100% { opacity: 0.28; }
-          50% { opacity: 0.5; }
+          0%, 100% { opacity: 0.26; }
+          50% { opacity: 0.48; }
         }
         @keyframes butterflyHover {
           0%, 100% { transform: translate(0px, 0px) scale(1); }
@@ -665,19 +910,32 @@ export function RealisticBotanicalCanvas({ days, isWateredToday }: Props) {
       >
         <defs>
           <linearGradient id="skyGrad" x1="0%" y1="0%" x2="0%" y2="100%">
-            <stop offset="0%" stopColor={meta.bgFrom} />
-            <stop offset="100%" stopColor={meta.bgTo} />
+            <stop offset="0%" stopColor={skyFrom} />
+            <stop offset="100%" stopColor={skyTo} />
           </linearGradient>
 
           <radialGradient id="sunHalo" cx="50%" cy="50%" r="50%">
-            <stop offset="0%" stopColor={meta.sunColor} stopOpacity={cd > 295 ? '0.45' : '0.72'} />
-            <stop offset="55%" stopColor={meta.sunColor} stopOpacity="0.18" />
-            <stop offset="100%" stopColor={meta.sunColor} stopOpacity="0" />
+            <stop offset="0%" stopColor={activeSunColor} stopOpacity={cd > 295 ? '0.45' : '0.72'} />
+            <stop offset="55%" stopColor={activeSunColor} stopOpacity="0.18" />
+            <stop offset="100%" stopColor={activeSunColor} stopOpacity="0" />
           </radialGradient>
 
-          <linearGradient id="sunBeam" x1="100%" y1="0%" x2="20%" y2="100%">
-            <stop offset="0%" stopColor={meta.sunColor} stopOpacity="0.45" />
-            <stop offset="100%" stopColor={meta.sunColor} stopOpacity="0" />
+          <radialGradient id="moonHalo" cx="50%" cy="50%" r="50%">
+            <stop offset="0%" stopColor="#E2E8F0" stopOpacity="0.45" />
+            <stop offset="60%" stopColor="#94A3B8" stopOpacity="0.12" />
+            <stop offset="100%" stopColor="#94A3B8" stopOpacity="0" />
+          </radialGradient>
+
+          <linearGradient
+            id="sunBeam"
+            x1={sunX}
+            y1={sunY}
+            x2={beamTargetX}
+            y2={beamTargetY}
+            gradientUnits="userSpaceOnUse"
+          >
+            <stop offset="0%" stopColor={activeSunColor} stopOpacity="0.42" />
+            <stop offset="100%" stopColor={activeSunColor} stopOpacity="0" />
           </linearGradient>
 
           <linearGradient id="trunkGrad" x1="0%" y1="0%" x2="100%" y2="0%">
@@ -700,7 +958,11 @@ export function RealisticBotanicalCanvas({ days, isWateredToday }: Props) {
 
           <linearGradient id="mistBand" x1="0%" y1="0%" x2="0%" y2="100%">
             <stop offset="0%" stopColor="#FFFFFF" stopOpacity="0" />
-            <stop offset="50%" stopColor="#FFFFFF" stopOpacity={cd >= 295 ? '0.42' : '0.58'} />
+            <stop
+              offset="50%"
+              stopColor="#FFFFFF"
+              stopOpacity={nightFactor > 0.5 ? '0.16' : cd >= 295 ? '0.42' : '0.58'}
+            />
             <stop offset="100%" stopColor="#FFFFFF" stopOpacity="0" />
           </linearGradient>
 
@@ -721,50 +983,79 @@ export function RealisticBotanicalCanvas({ days, isWateredToday }: Props) {
           </radialGradient>
         </defs>
 
-        {/* Sky */}
+        {/* 空 */}
         <rect x="-20" y="-20" width="560" height="360" fill="url(#skyGrad)" />
 
-        {/* Winter Crescent Moon / Stars */}
-        {cd >= 315 && (
-          <g fill="#FFFFFF" opacity={clamp((cd - 315) / 25, 0, 0.55)}>
+        {/* 夜空の星 */}
+        {(nightFactor > 0.1 || cd >= 315) && (
+          <g
+            fill="#FFFFFF"
+            opacity={Math.max(
+              nightFactor * 0.72,
+              cd >= 315 ? clamp((cd - 315) / 25, 0, 0.45) : 0
+            )}
+          >
             <circle cx="88" cy="42" r="1.2" />
             <circle cx="152" cy="28" r="1.0" />
             <circle cx="292" cy="34" r="1.3" />
+            <circle cx="426" cy="52" r="1.1" />
+            <circle cx="64" cy="92" r="0.9" />
+            <circle cx="378" cy="26" r="1.1" />
           </g>
         )}
 
-        {/* Dynamic Sun & Halo */}
-        <circle cx={sunX} cy={sunY} r="78" fill="url(#sunHalo)" />
-        <circle cx={sunX} cy={sunY} r="14" fill={meta.sunColor} opacity={cd > 295 ? '0.55' : '0.88'} />
+        {/* 現実時間と同期する太陽 */}
+        {sunOpacity > 0.02 && (
+          <g opacity={sunOpacity}>
+            <circle cx={sunX} cy={sunY} r="78" fill="url(#sunHalo)" />
+            <circle
+              cx={sunX}
+              cy={sunY}
+              r="14"
+              fill={activeSunColor}
+              opacity={cd > 295 ? '0.62' : '0.92'}
+            />
+          </g>
+        )}
 
-        {/* Mountain Clouds */}
-        <g fill="#FFFFFF" opacity={cd > 295 ? '0.35' : '0.58'}>
+        {/* 夜間の月 */}
+        {moonOpacity > 0.02 && (
+          <g opacity={moonOpacity}>
+            <circle cx={moonX} cy={moonY} r="44" fill="url(#moonHalo)" />
+            <path
+              d={`M ${(moonX + 3).toFixed(1)} ${(moonY - 10).toFixed(1)} A 10 10 0 1 0 ${(moonX + 10).toFixed(1)} ${(moonY + 4).toFixed(1)} A 8.5 8.5 0 1 1 ${(moonX + 3).toFixed(1)} ${(moonY - 10).toFixed(1)} Z`}
+              fill="#F8FAFC"
+            />
+          </g>
+        )}
+
+        {/* 雲 */}
+        <g fill="#FFFFFF" opacity={nightFactor > 0.5 ? '0.16' : cd > 295 ? '0.35' : '0.58'}>
           <path d="M52 54 C62 44, 84 44, 94 52 C104 48, 122 52, 126 60 L46 60 C44 57, 48 54, 52 54 Z" />
           <path d="M312 42 C320 35, 336 35, 344 41 C352 38, 364 41, 368 47 L306 47 C305 45, 308 42, 312 42 Z" />
         </g>
 
-        {/* Sunbeams Tracking the Sun */}
-        {cd < 305 && (
-          <g className="sun-pulse">
+        {/* 太陽の位置に追従する光線 */}
+        {sunbeamOpacity > 0.05 && (
+          <g className="sun-pulse" opacity={sunbeamOpacity}>
             <polygon
-              points={`${sunX - 18},${sunY - 4} ${sunX + 14},${sunY + 12} 258,248 186,232`}
+              points={`${(sunX - perpX * 14).toFixed(1)},${(sunY - perpY * 14).toFixed(1)} ${(sunX + perpX * 16).toFixed(1)},${(sunY + perpY * 16).toFixed(1)} ${(beamTargetX + perpX * 48).toFixed(1)},${(beamTargetY + perpY * 48).toFixed(1)} ${(beamTargetX - perpX * 42).toFixed(1)},${(beamTargetY - perpY * 42).toFixed(1)}`}
               fill="url(#sunBeam)"
             />
             <polygon
-              points={`${sunX - 4},${sunY + 6} ${sunX + 24},${sunY + 24} 330,256 276,246`}
+              points={`${(sunX - perpX * 4).toFixed(1)},${(sunY - perpY * 4).toFixed(1)} ${(sunX + perpX * 22).toFixed(1)},${(sunY + perpY * 22).toFixed(1)} ${(beamTargetX + 54 + perpX * 32).toFixed(1)},${(beamTargetY + 14 + perpY * 32).toFixed(1)} ${(beamTargetX + 18 - perpX * 16).toFixed(1)},${(beamTargetY + 6 - perpY * 16).toFixed(1)}`}
               fill="url(#sunBeam)"
-              opacity="0.65"
+              opacity="0.6"
             />
           </g>
         )}
 
-        {/* Layer 1: Distant Alpine Peaks */}
+        {/* 遠景の山並み */}
         <path
           d="M-20 235 L45 154 L96 176 L176 122 L248 168 L338 116 L418 162 L486 132 L540 168 L540 265 L-20 265 Z"
           fill={farMountain}
         />
 
-        {/* Winter Snow Caps */}
         {winterSnow > 0.05 && (
           <g fill="#FFFFFF" opacity={0.85 * winterSnow}>
             <path d="M176 122 L152 142 L166 138 L178 148 L190 139 L204 146 Z" />
@@ -773,12 +1064,12 @@ export function RealisticBotanicalCanvas({ days, isWateredToday }: Props) {
           </g>
         )}
 
-        {/* Valley Mist Band */}
+        {/* 谷霧 */}
         <g className="mist-drift">
           <rect x="-40" y="164" width="600" height="44" fill="url(#mistBand)" />
         </g>
 
-        {/* Layer 2: Midground Forested Ridge */}
+        {/* 中景の尾根 */}
         <path
           d="M-20 250 Q70 185 168 206 Q268 228 362 192 Q450 162 540 208 L540 280 L-20 280 Z"
           fill={midMountain}
@@ -789,29 +1080,41 @@ export function RealisticBotanicalCanvas({ days, isWateredToday }: Props) {
           <path d="M402 184 L409 164 L416 184 Z M422 181 L428 160 L434 181 Z M442 184 L449 166 L456 184 Z" />
         </g>
 
-        {/* Birds Gliding Gently Across the Ridge */}
-        {cd >= 10 && cd <= 285 && (
-          <g
-            transform={`translate(${((cd * 0.45) % 90) - 25}, ${Math.sin(cd * 0.08) * 6})`}
-            stroke="#334155"
-            strokeWidth="1.2"
-            strokeLinecap="round"
-            opacity="0.55"
-          >
-            <path d="M112 94 Q116 90 120 94 Q124 90 128 94" />
-            <path d="M132 86 Q135 83 138 86 Q141 83 144 86" />
-            <path d="M352 104 Q355 101 358 104 Q361 101 364 104" />
-          </g>
-        )}
+        {/* 自律的に飛び回るカモメ */}
+        <g
+          stroke={nightFactor > 0.45 ? '#CBD5E1' : '#334155'}
+          strokeWidth="1.35"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          fill="none"
+        >
+          {INITIAL_SEAGULLS.map((g, idx) => (
+            <g
+              key={idx}
+              ref={(el) => {
+                gullGroupRefs.current[idx] = el;
+              }}
+              transform={`translate(${g.x}, ${g.y}) scale(${g.scale})`}
+              opacity={g.baseOpacity}
+            >
+              <path
+                ref={(el) => {
+                  gullPathRefs.current[idx] = el;
+                }}
+                d={buildSeagullPath(-0.2, g.vx / g.cruiseSpeed)}
+              />
+            </g>
+          ))}
+        </g>
 
-        {/* Layer 3: Foreground Mountain Knoll */}
+        {/* 近景の丘 */}
         <path
           d="M-20 278 Q105 244 256 248 Q390 252 540 276 L540 340 L-20 340 Z"
           fill="url(#hillGrad)"
         />
         <path d="M128 264 Q256 242 384 268 Q256 254 128 264 Z" fill="#000000" opacity="0.06" />
 
-        {/* Winding Mountain Brook */}
+        {/* 小川 */}
         {cd < 322 && (
           <g>
             <path
@@ -827,7 +1130,7 @@ export function RealisticBotanicalCanvas({ days, isWateredToday }: Props) {
           </g>
         )}
 
-        {/* Mountain Boulders with Moss / Snow */}
+        {/* 岩と苔 */}
         <g>
           <path d="M188 260 C190 247, 214 244, 224 257 C226 263, 190 264, 188 260 Z" fill="#64748B" />
           <path
@@ -843,7 +1146,7 @@ export function RealisticBotanicalCanvas({ days, isWateredToday }: Props) {
           />
         </g>
 
-        {/* Rich Soil Pocket */}
+        {/* 土壌 */}
         <ellipse cx="263" cy="253" rx="36" ry="6.5" fill="url(#soilPocket)" />
         {isWateredToday && cd < 318 && (
           <g fill="#BAE6FD" opacity="0.88">
@@ -853,7 +1156,7 @@ export function RealisticBotanicalCanvas({ days, isWateredToday }: Props) {
           </g>
         )}
 
-        {/* Grass Tufts & Wildflowers */}
+        {/* 草花 */}
         {cd < 325 && (
           <g stroke={autumnWarmth > 0.4 ? '#92400E' : '#3F7D20'} strokeWidth="1.3" strokeLinecap="round">
             <path d="M164 264 Q160 254 156 250 M166 264 Q167 253 171 249" />
@@ -871,31 +1174,43 @@ export function RealisticBotanicalCanvas({ days, isWateredToday }: Props) {
           </g>
         )}
 
-        {/* Cycle 2+: Seamless Previous-Cycle Parent Tree Weathering Into Mossy Ancestor */}
+        {/* サイクル2以降：春先のみ薄く残る前年の名残(cd 1..14) ＋ 苔むした古株(cd 1..75) */}
         {isSecondGen && oldSkel && (
-          <g
-            transform="translate(260, 253)"
-            opacity={lerp(0.95, 0.36, clamp((cd - 1) / 110, 0, 1))}
-          >
+          <g transform="translate(256, 253)" opacity={oldTreeUpperFade * 0.68}>
             {renderTrunkAndBranches(
               oldSkel,
               'url(#oldTrunkGrad)',
               '#4A433E',
-              lerp(0.88, 0, clamp(cd / 24, 0, 1)),
-              clamp((cd - 14) / 75, 0, 1)
+              lerp(0.75, 0, clamp(cd / 10, 0, 1)),
+              clamp((cd - 1) / 10, 0, 1)
             )}
-            {/* Spring Moss Spreading Along the Weathered Trunk */}
-            {cd >= 12 && (
-              <g fill="#65A30D" opacity={clamp((cd - 12) / 45, 0, 0.78)}>
-                <ellipse cx="-6" cy="-12" rx="4.5" ry="7" />
-                <ellipse cx="4" cy="-28" rx="3.2" ry="6" />
-                <ellipse cx="-3" cy="-54" rx="3.5" ry="5" />
+          </g>
+        )}
+
+        {isSecondGen && oldStumpOpacity > 0.02 && (
+          <g transform="translate(255, 253)" opacity={oldStumpOpacity}>
+            <path
+              d="M -14 3 C -8.5 0.5, -7 -7, -6 -17 L -2 -19 L 2 -15.5 L 5.8 -18 C 7 -7.5, 8.5 0.5, 13.5 3 Z"
+              fill="url(#oldTrunkGrad)"
+            />
+            <path
+              d="M -2 -3 Q -3 -9.5 -1 -15 M 2 -2 Q 3 -8.5 2 -14"
+              stroke="#3F3934"
+              strokeWidth="0.9"
+              strokeOpacity="0.45"
+              strokeLinecap="round"
+            />
+            {cd >= 4 && (
+              <g fill="#65A30D" opacity={clamp((cd - 4) / 14, 0.25, 0.85)}>
+                <ellipse cx="-5" cy="-6.5" rx="3.2" ry="4.4" />
+                <ellipse cx="4.2" cy="-4.8" rx="2.6" ry="3.6" />
+                <ellipse cx="-1.5" cy="-15.5" rx="2.5" ry="1.7" fill="#84CC16" />
               </g>
             )}
           </g>
         )}
 
-        {/* Day 0: Dormant Seed */}
+        {/* Day 0: 種 */}
         {days === 0 && (
           <g>
             <path
@@ -908,21 +1223,20 @@ export function RealisticBotanicalCanvas({ days, isWateredToday }: Props) {
           </g>
         )}
 
-        {/* Stage A (cd 1..23): Lively Sprout with Germination Hook & Undulating Stem */}
+        {/* 発芽フェーズ (cd 1..23) */}
         {isSproutPhase && (
-          <g transform={`translate(${treeBaseX}, 253)`}>
+          <g transform={`translate(${treeBaseX.toFixed(1)}, 253)`}>
             <g className={swayClass}>
               <path
                 d={`M -1.6 0 Q ${(-2 + sproutWave).toFixed(1)} ${(-sproutH * 0.5).toFixed(1)}, ${(
-                  (isSecondGen ? 6 : 0) + sproutHook * 0.5
+                  (isSecondGen ? 4 : 0) + sproutHook * 0.5
                 ).toFixed(1)} ${(-sproutH).toFixed(1)}
-                L ${((isSecondGen ? 6 : 0) + 1.4 + sproutHook * 0.5).toFixed(1)} ${(-sproutH).toFixed(1)}
+                L ${((isSecondGen ? 4 : 0) + 1.4 + sproutHook * 0.5).toFixed(1)} ${(-sproutH).toFixed(1)}
                 Q ${(1.2 + sproutWave).toFixed(1)} ${(-sproutH * 0.5).toFixed(1)}, 1.6 0 Z`}
                 fill="#4D7C0F"
               />
-              {/* Cotyledons */}
               <g
-                transform={`translate(${((isSecondGen ? 3 : 0) + sproutWave * 0.5).toFixed(1)}, ${(
+                transform={`translate(${((isSecondGen ? 2 : 0) + sproutWave * 0.5).toFixed(1)}, ${(
                   -sproutH * 0.48
                 ).toFixed(1)}) rotate(${sproutHook * 3.5})`}
               >
@@ -939,10 +1253,9 @@ export function RealisticBotanicalCanvas({ days, isWateredToday }: Props) {
                   strokeWidth="0.6"
                 />
               </g>
-              {/* Unfolding True Leaves */}
               {cd >= 8 && (
                 <g
-                  transform={`translate(${((isSecondGen ? 6 : 0) + sproutHook * 0.5).toFixed(1)}, ${(
+                  transform={`translate(${((isSecondGen ? 4 : 0) + sproutHook * 0.5).toFixed(1)}, ${(
                     -sproutH
                   ).toFixed(1)}) scale(${clamp((cd - 7) / 14, 0.3, 1)})`}
                 >
@@ -970,14 +1283,12 @@ export function RealisticBotanicalCanvas({ days, isWateredToday }: Props) {
           </g>
         )}
 
-        {/* Stage B (cd >= 24): Living Mountain Tree */}
+        {/* 樹木フェーズ (cd >= 24) */}
         {days >= 1 && !isSproutPhase && skel && (
-          <g transform={`translate(${treeBaseX}, 253)`}>
+          <g transform={`translate(${treeBaseX.toFixed(1)}, 253)`}>
             <g className={swayClass}>
-              {/* 1. Back Foliage Layer */}
               <g className={cd < 305 ? 'canopy-breath' : undefined}>{renderClusterLayer('back')}</g>
 
-              {/* 2. Sinuous Trunk, Roots & Branches */}
               {renderTrunkAndBranches(
                 skel,
                 'url(#trunkGrad)',
@@ -985,13 +1296,11 @@ export function RealisticBotanicalCanvas({ days, isWateredToday }: Props) {
                 cd >= 306 ? clamp((cd - 306) / 22, 0, 0.92) : 0
               )}
 
-              {/* 3. Mid & Front Foliage Layers */}
               <g className={cd < 305 ? 'canopy-breath' : undefined}>
                 {renderClusterLayer('mid')}
                 {renderClusterLayer('front')}
               </g>
 
-              {/* 4. Swelling Buds (cd 125..179) */}
               {isBudStage &&
                 BLOSSOM_NODES.map((node) => {
                   const pos = getAnchorPoint(skel, node.branchId, node.branchT, node.ox, node.oy);
@@ -1017,7 +1326,6 @@ export function RealisticBotanicalCanvas({ days, isWateredToday }: Props) {
                   );
                 })}
 
-              {/* 5. Full Bloom Blossoms & Withered Petal Drop (cd 178..238) */}
               {isFlowerStage &&
                 BLOSSOM_NODES.map((node) => {
                   const pos = getAnchorPoint(skel, node.branchId, node.branchT, node.ox, node.oy);
@@ -1055,7 +1363,6 @@ export function RealisticBotanicalCanvas({ days, isWateredToday }: Props) {
                   );
                 })}
 
-              {/* 6. Ripening Autumn Berries (cd 228..298) */}
               {isBerryStage &&
                 BLOSSOM_NODES.filter((n) => n.hasBerry).map((node) => {
                   const pos = getAnchorPoint(skel, node.branchId, node.branchT, node.ox, node.oy);
@@ -1077,7 +1384,7 @@ export function RealisticBotanicalCanvas({ days, isWateredToday }: Props) {
           </g>
         )}
 
-        {/* Butterfly Hovering Near Sunlit Blossoms */}
+        {/* 蝶 */}
         {cd >= 178 && cd <= 232 && (
           <g transform="translate(332, 108)">
             <g className="butterfly-hover">
@@ -1088,7 +1395,7 @@ export function RealisticBotanicalCanvas({ days, isWateredToday }: Props) {
           </g>
         )}
 
-        {/* Spring / Summer Motes */}
+        {/* 光の粒子 */}
         {cd >= 1 && cd <= 165 && (
           <g fill={cd <= 75 ? '#BEF264' : '#FEF08A'} opacity="0.72">
             <circle cx="204" cy="182" r="1.8" />
@@ -1098,7 +1405,7 @@ export function RealisticBotanicalCanvas({ days, isWateredToday }: Props) {
           </g>
         )}
 
-        {/* Bloom Drifting Petals */}
+        {/* 舞う花びら */}
         {cd >= 180 && cd <= 238 && (
           <g>
             <g className="petal-fall-a">
@@ -1112,7 +1419,7 @@ export function RealisticBotanicalCanvas({ days, isWateredToday }: Props) {
           </g>
         )}
 
-        {/* Fallen Leaf Carpet Accumulating Naturally Across Autumn */}
+        {/* 落ち葉 */}
         {cd >= 265 && cd <= 352 && (
           <g opacity={cd > 330 ? clamp(1 - (cd - 330) / 25, 0.25, 0.85) : 0.9}>
             {[
@@ -1136,7 +1443,7 @@ export function RealisticBotanicalCanvas({ days, isWateredToday }: Props) {
           </g>
         )}
 
-        {/* Winter Snowfall & Sheltered Seeds Waiting Beside Roots */}
+        {/* 降雪 */}
         {cd >= 302 && (
           <g fill="#FFFFFF">
             <g className="petal-fall-a" opacity="0.85">
@@ -1156,28 +1463,32 @@ export function RealisticBotanicalCanvas({ days, isWateredToday }: Props) {
 
         {cd >= 325 && (
           <g>
-            {/* Snapped Winter Twig Resting on Snow */}
             <path d="M234 259 L246 256 M241 257 L245 253" stroke="#574C43" strokeWidth="1.2" strokeLinecap="round" />
-            {/* Dormant Seed Nestled at Right Root Edge Ready for Cycle 2 Sprout */}
             <ellipse cx="268" cy="254" rx="2.8" ry="1.8" fill="#78350F" />
             <ellipse cx="248" cy="255" rx="2.0" ry="1.3" fill="#451A03" />
           </g>
         )}
       </svg>
 
-      {/* Season Badge */}
+      {/* 季節バッジ */}
       <div className="absolute top-3.5 left-3.5 flex flex-col gap-1">
         <span
           className={`inline-flex items-center gap-1.5 text-[10px] font-semibold tracking-wider px-2.5 py-1 rounded-full border backdrop-blur-xs ${meta.badgeClass}`}
         >
           <span>{meta.seasonEn}</span>
         </span>
-        <span className="text-[11px] font-medium text-slate-700/90 pl-1 drop-shadow-[0_1px_1px_rgba(255,255,255,0.8)]">
+        <span
+          className={`text-[11px] font-medium pl-1 ${
+            nightFactor > 0.5
+              ? 'text-slate-100/90 drop-shadow-[0_1px_2px_rgba(0,0,0,0.65)]'
+              : 'text-slate-700/90 drop-shadow-[0_1px_1px_rgba(255,255,255,0.8)]'
+          }`}
+        >
           {meta.seasonJa}
         </span>
       </div>
 
-      {/* Cycle & Day Counter */}
+      {/* サイクル・日数カウンター */}
       <div className="absolute top-3.5 right-3.5 text-right bg-white/75 backdrop-blur-xs px-2.5 py-1.5 rounded-xl border border-slate-200/70">
         <div className="text-[10px] font-medium text-slate-400">
           Cycle {String(cycle).padStart(2, '0')}
