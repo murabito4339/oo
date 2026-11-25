@@ -1,4 +1,4 @@
-import type { SeasonMeta } from './types';
+import type { GrowthStageMeta, SeasonKey, SpeciesId } from './types';
 
 export function clamp(v: number, min: number, max: number) {
   return Math.min(max, Math.max(min, v));
@@ -18,86 +18,119 @@ export function lerpColor(hex1: string, hex2: string, t: number) {
   return `#${((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1)}`;
 }
 
-export function getSeasonMeta(days: number): SeasonMeta {
+export function tintForTime(
+  hex: string,
+  nightFactor: number,
+  nightTarget: string,
+  strength: number
+) {
+  return nightFactor > 0 ? lerpColor(hex, nightTarget, nightFactor * strength) : hex;
+}
+
+export function getDayOfYear(date: Date): number {
+  const start = new Date(date.getFullYear(), 0, 0);
+  const diff =
+    date.getTime() -
+    start.getTime() +
+    (start.getTimezoneOffset() - date.getTimezoneOffset()) * 60000;
+  return clamp(Math.floor(diff / 86400000), 1, 366);
+}
+
+export function getSeasonFromDate(date: Date | null): SeasonKey {
+  if (!date) return 'spring';
+  const month = date.getMonth() + 1;
+  if (month >= 3 && month <= 5) return 'spring';
+  if (month >= 6 && month <= 8) return 'summer';
+  if (month >= 9 && month <= 11) return 'autumn';
+  return 'winter';
+}
+
+const SPECIES_LABEL: Record<SpeciesId, string> = {
+  spring: '山桜',
+  summer: 'ハイビスカス',
+  autumn: '山楓',
+  winter: '常緑松・寒椿',
+};
+
+export function getGrowthStageMeta(days: number, speciesId: SpeciesId): GrowthStageMeta {
+  const name = SPECIES_LABEL[speciesId];
   if (days === 0) {
     return {
-      seasonEn: 'DORMANT',
-      seasonJa: '播種・山の目覚め前',
-      desc: '朝霧に包まれた山の土の中で、小さな種が静かに春の発芽を待っています。',
-      bgFrom: '#E8EEF5',
-      bgTo: '#DCE5EE',
-      sunColor: '#CBD5E1',
-      badgeClass: 'bg-slate-100 text-slate-600 border-slate-200',
+      stageEn: 'DORMANT',
+      stageJa: `${name} · 播種`,
+      desc: `山の土の中で、${name}の小さな種が静かに最初の一滴を待っています。`,
     };
   }
+
   const cycle = Math.floor((days - 1) / 360) + 1;
   const cd = ((days - 1) % 360) + 1;
 
-  if (cd <= 55) {
+  if (cd <= 23) {
     return {
-      seasonEn: cycle > 1 ? 'REBIRTH · SPRING' : 'SPRING',
-      seasonJa: cycle > 1 ? '第2世代・山の芽吹き' : '春 · 芽吹き',
+      stageEn: cycle > 1 ? 'REBIRTH · SPROUT' : 'SPROUT',
+      stageJa: cycle > 1 ? `${name} · 第${cycle}世代の芽吹き` : `${name} · 発芽`,
       desc:
         cycle > 1
-          ? '前年の苔むした古株の傍らから、新しい命の若木が春の木漏れ日を浴びて伸び始めています。'
-          : '澄んだ山の春光を受け、瑞々しい若葉と枝が力強く広がり始めています。',
-      bgFrom: '#E4F2FE',
-      bgTo: '#F1F9EE',
-      sunColor: '#FDE68A',
-      badgeClass: 'bg-emerald-50 text-emerald-700 border-emerald-200/80',
+          ? `苔むした古株の傍らから、新しい世代の${name}が力強く双葉を広げています。`
+          : `柔らかな土から${name}の若芽が顔を出し、季節の光を受け止めています。`,
     };
   }
+
   if (cd <= 125) {
     return {
-      seasonEn: 'EARLY SUMMER',
-      seasonJa: '初夏 · 新緑と枝葉',
-      desc: '幹と枝が大きく張り出し、幾重にも重なる新緑の葉が山の風と光を浴びて呼吸しています。',
-      bgFrom: '#D6ECFD',
-      bgTo: '#EBF6EF',
-      sunColor: '#FCD34D',
-      badgeClass: 'bg-teal-50 text-teal-700 border-teal-200/80',
+      stageEn: 'GROWING',
+      stageJa: `${name} · 枝葉の成長`,
+      desc:
+        speciesId === 'summer'
+          ? '太い枝を放射状に伸ばし、艶やかなトロピカルの広葉がみずみずしく茂っています。'
+          : speciesId === 'autumn'
+            ? '風情ある枝先に切れ込みのある楓の葉が広がり、木立の輪郭が整ってきました。'
+            : speciesId === 'winter'
+              ? '深緑の針葉を層のように重ね、どんな季節の風にも揺るがない凛とした樹形が育っています。'
+              : 'しなやかな幹と枝が大きく張り出し、幾重にも重なる葉が山の風を受けて呼吸しています。',
     };
   }
+
   if (cd <= 179) {
     return {
-      seasonEn: 'HIGH SUMMER',
-      seasonJa: '盛夏 · 花芽の成熟',
-      desc: '青々とした枝先に無数の花芽が膨らみました。180日目の開花まであと少しです。',
-      bgFrom: '#CFE6FC',
-      bgTo: '#E8F3FA',
-      sunColor: '#FBBF24',
-      badgeClass: 'bg-sky-50 text-sky-700 border-sky-200/80',
+      stageEn: 'BUDDING',
+      stageJa: `${name} · 花芽の成熟`,
+      desc: `${name}の枝先に無数の蕾が膨らみました。180日目の開花まであと少しです。`,
     };
   }
+
   if (cd <= 228) {
     return {
-      seasonEn: 'ANTHESIS · BLOOM',
-      seasonJa: '満開 · 山花の輝き',
-      desc: '180日の積み重ねが結実し、山あいの空のもとで気品ある花々が一斉に咲き誇っています。',
-      bgFrom: '#E6EDFC',
-      bgTo: '#FCF1F7',
-      sunColor: '#FDE047',
-      badgeClass: 'bg-indigo-50 text-indigo-700 border-indigo-200/80',
+      stageEn: 'ANTHESIS · BLOOM',
+      stageJa: `${name} · 満開`,
+      desc:
+        speciesId === 'summer'
+          ? '180日の積み重ねが結実し、太陽のように鮮やかな大輪のハイビスカスが咲き誇っています。'
+          : speciesId === 'autumn'
+            ? '繊細な花々とともに、楓の樹冠が鮮やかな彩りを帯び始めています。'
+            : speciesId === 'winter'
+              ? '深い緑の枝葉の合間から、凛と気高い真紅の寒椿が鮮やかに花開いています。'
+              : '180日の積み重ねが実を結び、山あいの空のもとで山桜の花々が一斉に咲き誇っています。',
     };
   }
+
   if (cd <= 295) {
     return {
-      seasonEn: 'AUTUMN',
-      seasonJa: '秋 · 紅葉と結実',
-      desc: '花後に小さな木の実が実り、木々の葉は深緑から黄金・茜色へと鮮やかに染まっています。',
-      bgFrom: '#FCEAD5',
-      bgTo: '#F5E4D8',
-      sunColor: '#F59E0B',
-      badgeClass: 'bg-amber-50 text-amber-800 border-amber-200/80',
+      stageEn: 'FRUITING',
+      stageJa: `${name} · 結実と成熟`,
+      desc:
+        speciesId === 'autumn'
+          ? '枝先に小さな木の実が実り、楓の葉は黄金や朱色へと深く色づいています。'
+          : `${name}の枝先に小さな実りが宿り、次の命へと向かう豊かな季節を迎えています。`,
     };
   }
+
   return {
-    seasonEn: 'WINTER',
-    seasonJa: '冬 · 雪化粧と越冬',
-    desc: 'すべての葉が山の土へ還り、種と冬芽を抱いて雪景色の中で静かに春を待ちます。',
-    bgFrom: '#D9E3EF',
-    bgTo: '#ECF1F7',
-    sunColor: '#E2E8F0',
-    badgeClass: 'bg-slate-100 text-slate-700 border-slate-300/70',
+    stageEn: speciesId === 'winter' || speciesId === 'summer' ? 'EVERGREEN · REST' : 'DORMANT · REST',
+    stageJa: speciesId === 'winter' ? `${name} · 越冬` : `${name} · 静養と再生前`,
+    desc:
+      speciesId === 'winter'
+        ? '常緑の葉を保ったまま種を抱き、次のサイクルへ向けた静かな再生を待っています。'
+        : '葉を休め、次の世代の種と芽を土に託して、静かに新しいサイクルを待っています。',
   };
 }
