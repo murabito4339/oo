@@ -154,9 +154,9 @@ export function RealisticBotanicalCanvas({
           0%, 100% { transform: rotate(-1.15deg); }
           50% { transform: rotate(1.35deg); }
         }
-        @keyframes canopyBreath {
-          0%, 100% { transform: translate(0px, 0px) rotate(-0.4deg); }
-          50% { transform: translate(1.2px, -0.8px) rotate(0.6deg); }
+        @keyframes leafSway {
+          0%, 100% { transform: rotate(calc(var(--sway-amp, 1.4deg) * -0.7)); }
+          50% { transform: rotate(var(--sway-amp, 1.4deg)); }
         }
         @keyframes mistDrift {
           0%, 100% { transform: translateX(-10px); }
@@ -190,9 +190,18 @@ export function RealisticBotanicalCanvas({
           animation: mountainTreeSway 6.2s ease-in-out infinite;
           transform-origin: 0px 0px;
         }
-        .canopy-breath {
-          animation: canopyBreath 4.6s ease-in-out infinite;
-          transform-origin: 0px -80px;
+        .leaf-sway,
+        .leaf-flutter {
+          animation-name: leafSway;
+          animation-timing-function: ease-in-out;
+          animation-iteration-count: infinite;
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .mountain-tree-sway,
+          .leaf-sway,
+          .leaf-flutter {
+            animation: none;
+          }
         }
         .mist-drift {
           animation: mistDrift 12s ease-in-out infinite;
