@@ -1,19 +1,10 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import {
-  ArrowUpRight,
-  BookOpen,
-  Check,
-  Crown,
-  Headphones,
-  Layers,
-  Lock,
-  Mic,
-  PenTool,
-  Zap,
-} from 'lucide-react';
-import { NodeDetailModal } from '@/components/modals/NodeDetailModal';
+import { useEffect, useRef, useState } from "react";
+import { BookOpen, Check, Lock, Trophy } from "lucide-react";
+import { NodePopover } from "@/components/path/NodePopover";
+import { StrandBalance } from "@/components/path/StrandBalance";
+import { Sprout } from "@/components/ui/Sprout";
 import {
   NODE_TEMPLATE,
   PATH_CENTER_X,
@@ -21,222 +12,315 @@ import {
   ROW_HEIGHT,
   SECTIONS,
   SNAKE_OFFSETS,
+  STRAND_META,
   TOP_OFFSET,
-} from '@/constants/curriculum';
-import type { NodeItem, SectionData } from '@/types/lexis';
+  TOTAL_STEPS,
+} from "@/constants/curriculum";
+import { NODE_ICONS, STRAND_THEME, THEME } from "@/lib/theme";
+import type { NodeItem, SectionData } from "@/types/lexis";
 
 type Props = {
   selectedSectionId: string;
   sectionProgress: Record<string, number>;
-  currentSection: SectionData;
-  doneCount: number;
   onSelectSection: (id: string) => void;
-  onCompleteNode: (node: NodeItem) => void;
+  onCompleteNode: (sectionId: string, node: NodeItem) => void;
   onOpenVocab: () => void;
 };
+
+type OpenNode = { sectionId: string; step: number } | null;
 
 export function PathTab({
   selectedSectionId,
   sectionProgress,
-  currentSection,
-  doneCount,
   onSelectSection,
   onCompleteNode,
   onOpenVocab,
 }: Props) {
-  const [activeNodeModal, setActiveNodeModal] = useState<NodeItem | null>(null);
+  const [openNode, setOpenNode] = useState<OpenNode>(null);
+  const currentNodeRef = useRef<HTMLButtonElement | null>(null);
 
-  const nodeCoords = NODE_TEMPLATE.map((_, idx) => ({
-    x: PATH_CENTER_X + SNAKE_OFFSETS[idx % SNAKE_OFFSETS.length],
-    y: TOP_OFFSET + idx * ROW_HEIGHT,
-  }));
-  const totalPathHeight = TOP_OFFSET + (NODE_TEMPLATE.length - 1) * ROW_HEIGHT + 72;
+  // 開いたときに、選択中セクションの「次のステップ」まで自動スクロール
+  useEffect(() => {
+    currentNodeRef.current?.scrollIntoView({
+      block: "center",
+      behavior: "instant" as ScrollBehavior,
+    });
+  }, []);
 
   return (
-    <div className="space-y-5 animate-soft-pop">
-      <div className="space-y-2">
-        <div className="flex items-center justify-between text-xs text-slate-500 px-0.5">
-          <span className="font-medium">カリキュラム・セクション</span>
-          <span className="tabular-nums text-[11px] text-slate-400">全50セクション構成</span>
+    <div className="space-y-6 animate-soft-pop">
+      <StrandBalance />
+
+      {openNode && (
+        <button
+          aria-label="閉じる"
+          className="fixed inset-0 z-20 cursor-default"
+          onClick={() => setOpenNode(null)}
+        />
+      )}
+
+      {SECTIONS.map((section, sectionIdx) => (
+        <UnitPath
+          key={section.id}
+          section={section}
+          sectionIdx={sectionIdx}
+          doneCount={sectionProgress[section.id] ?? 0}
+          isSelected={section.id === selectedSectionId}
+          openStep={openNode?.sectionId === section.id ? openNode.step : null}
+          currentNodeRef={
+            section.id === selectedSectionId ? currentNodeRef : undefined
+          }
+          onToggleNode={(step) =>
+            setOpenNode((prev) =>
+              prev?.sectionId === section.id && prev.step === step
+                ? null
+                : { sectionId: section.id, step },
+            )
+          }
+          onStart={(node) => {
+            onSelectSection(section.id);
+            onCompleteNode(section.id, node);
+            setOpenNode(null);
+          }}
+          onOpenVocab={() => {
+            onSelectSection(section.id);
+            onOpenVocab();
+          }}
+          nextSection={SECTIONS[sectionIdx + 1]}
+        />
+      ))}
+    </div>
+  );
+}
+
+function UnitPath({
+  section,
+  sectionIdx,
+  doneCount,
+  isSelected,
+  openStep,
+  currentNodeRef,
+  onToggleNode,
+  onStart,
+  onOpenVocab,
+  nextSection,
+}: {
+  section: SectionData;
+  sectionIdx: number;
+  doneCount: number;
+  isSelected: boolean;
+  openStep: number | null;
+  currentNodeRef?: React.RefObject<HTMLButtonElement | null>;
+  onToggleNode: (step: number) => void;
+  onStart: (node: NodeItem) => void;
+  onOpenVocab: () => void;
+  nextSection?: SectionData;
+}) {
+  const theme = THEME[section.color];
+  const isComplete = doneCount >= TOTAL_STEPS;
+  const coords = NODE_TEMPLATE.map((_, idx) => ({
+    x: PATH_CENTER_X + SNAKE_OFFSETS[idx],
+    y: TOP_OFFSET + idx * ROW_HEIGHT,
+  }));
+  const pathHeight = TOP_OFFSET + (NODE_TEMPLATE.length - 1) * ROW_HEIGHT + 96;
+
+  // マスコットは中央に戻るノード（ラベルが右に出る行）の左側に置く
+  const mascotRow = sectionIdx % 2 === 0 ? 4 : 8;
+  const mascotX = 48;
+  const mascotY = coords[mascotRow].y;
+
+  return (
+    <section aria-labelledby={`${section.id}-title`}>
+      {/* ユニットバナー（スクロール中は上部に固定） */}
+      <div className="sticky top-[58px] xl:top-0 z-10 bg-white pt-3 xl:pt-6 pb-2 -mx-1 px-1">
+        <div
+          className={`rounded-2xl ${theme.bg} text-white px-5 py-4 flex items-center justify-between gap-3`}
+          style={{ boxShadow: `0 4px 0 ${theme.chunk}` }}
+        >
+          <div className="min-w-0">
+            <div className="text-[11px] font-extrabold tracking-wider text-white/80">
+              ユニット {section.unit} · {section.code}
+            </div>
+            <h2
+              id={`${section.id}-title`}
+              className="text-xl font-black leading-tight truncate"
+            >
+              {section.title}
+            </h2>
+            <div className="mt-1 flex items-center gap-2 text-xs font-extrabold text-white/90">
+              {isComplete ? (
+                <span className="inline-flex items-center gap-1 rounded-full bg-white/20 px-2 py-0.5">
+                  <Trophy className="w-3.5 h-3.5" />
+                  修了
+                </span>
+              ) : (
+                <span className="tabular-nums whitespace-nowrap">
+                  {doneCount} / {TOTAL_STEPS} ステップ
+                </span>
+              )}
+              <span className="truncate text-white/75">{section.subtitle}</span>
+            </div>
+          </div>
+          <button
+            onClick={onOpenVocab}
+            className="btn-3d shrink-0 px-3 py-2.5 text-xs text-white border-2 border-white/40 bg-white/10"
+            style={{ ["--chunk" as string]: theme.chunk }}
+          >
+            <BookOpen className="w-4 h-4" />
+            語彙一覧
+          </button>
         </div>
-        <div className="flex gap-2 overflow-x-auto pb-1">
-          {SECTIONS.map((sec) => {
-            const isSelected = sec.id === selectedSectionId;
-            const prog = sectionProgress[sec.id] ?? 0;
+      </div>
+
+      {/* パス本体 */}
+      <div className="flex justify-center pt-4">
+        <div
+          className="relative"
+          style={{ width: PATH_WIDTH, height: pathHeight }}
+        >
+          <div
+            className="absolute pointer-events-none"
+            style={{ left: mascotX - 44, top: mascotY - 40 }}
+          >
+            <Sprout
+              size={88}
+              mood={isComplete ? "cheer" : doneCount === 0 ? "sleepy" : "happy"}
+            />
+          </div>
+
+          {NODE_TEMPLATE.map((node, idx) => {
+            const status: "done" | "current" | "locked" =
+              node.step <= doneCount
+                ? "done"
+                : node.step === doneCount + 1
+                  ? "current"
+                  : "locked";
+            const { x, y } = coords[idx];
+            const isBoss = node.kind === "boss";
+            const size = isBoss ? 84 : 70;
+            const Icon = NODE_ICONS[node.icon];
+            const isOpen = openStep === node.step;
+
+            const popLeft = Math.min(Math.max(x - 150, -16), PATH_WIDTH - 284);
+
             return (
-              <button
-                key={sec.id}
-                onClick={() => onSelectSection(sec.id)}
-                className={`shrink-0 px-3.5 py-2.5 rounded-xl border text-left transition-all ${
-                  isSelected
-                    ? 'bg-slate-900 text-white border-slate-900 shadow-sm'
-                    : 'bg-white text-slate-700 border-slate-200/80 hover:border-slate-300'
-                }`}
-              >
-                <div className="flex items-center justify-between gap-3">
-                  <span
-                    className={`text-[10px] font-medium tracking-wider ${
-                      isSelected ? 'text-slate-300' : 'text-slate-400'
-                    }`}
+              <div key={node.step}>
+                <div
+                  className={`absolute flex flex-col items-center ${isOpen ? "z-30" : "z-0"}`}
+                  style={{
+                    left: x,
+                    top: y,
+                    transform: "translate(-50%, -50%)",
+                  }}
+                >
+                  {status === "current" && !isOpen && (
+                    <div
+                      className={`absolute left-1/2 -top-[50px] z-10 animate-bobble whitespace-nowrap rounded-xl border-2 border-line bg-white px-3 py-1.5 text-sm font-black ${theme.textDark}`}
+                    >
+                      {isSelected ? "はじめる" : "つづき"}
+                      <span className="absolute left-1/2 -bottom-[7px] -translate-x-1/2 w-3 h-3 rotate-45 bg-white border-r-2 border-b-2 border-line" />
+                    </div>
+                  )}
+
+                  <div
+                    className="relative"
+                    style={{ width: size, height: size }}
                   >
-                    {sec.code}
-                  </span>
-                  <span
-                    className={`text-[10px] tabular-nums font-medium ${
-                      isSelected ? 'text-indigo-300' : 'text-slate-400'
-                    }`}
+                    {status === "current" && (
+                      <span
+                        className={`absolute -inset-[9px] rounded-full border-[6px] ${theme.border} opacity-40 animate-ring-pulse ${
+                          isBoss ? "rounded-[30px]" : ""
+                        }`}
+                      />
+                    )}
+                    <button
+                      ref={status === "current" ? currentNodeRef : undefined}
+                      onClick={() => onToggleNode(node.step)}
+                      aria-label={`${node.label}（${status === "done" ? "完了" : status === "current" ? "次のステップ" : "ロック中"}）`}
+                      aria-expanded={isOpen}
+                      className={`node-3d relative flex items-center justify-center w-full h-full ${
+                        isBoss ? "rounded-[26px]" : "rounded-full"
+                      } ${status === "locked" ? "bg-line text-ink-faint" : `${theme.bg} text-white`}`}
+                      style={{
+                        ["--chunk" as string]:
+                          status === "locked"
+                            ? "var(--line-dark)"
+                            : theme.chunk,
+                      }}
+                    >
+                      {/* 上面のハイライト */}
+                      <span
+                        className={`absolute top-[14%] left-1/2 -translate-x-1/2 w-[46%] h-[12%] rounded-full ${
+                          status === "locked" ? "bg-white/50" : "bg-white/25"
+                        }`}
+                      />
+                      {status === "done" && !isBoss ? (
+                        <Check className="w-8 h-8" strokeWidth={3.5} />
+                      ) : status === "locked" && !isBoss ? (
+                        <Lock className="w-7 h-7" strokeWidth={2.6} />
+                      ) : (
+                        <Icon
+                          className={isBoss ? "w-10 h-10" : "w-8 h-8"}
+                          strokeWidth={2.6}
+                        />
+                      )}
+                      {status === "done" && isBoss && (
+                        <span className="absolute -top-2 -right-2 w-7 h-7 rounded-full bg-sun border-2 border-white flex items-center justify-center">
+                          <Check className="w-4 h-4" strokeWidth={3.5} />
+                        </span>
+                      )}
+                    </button>
+                  </div>
+
+                  {/* ラベルは蛇行の内側（中央寄り）に出す */}
+                  <div
+                    className={`absolute top-1/2 -translate-y-1/2 flex flex-col whitespace-nowrap ${
+                      SNAKE_OFFSETS[idx] > 0
+                        ? "right-full mr-3 items-end text-right"
+                        : "left-full ml-3 items-start"
+                    } ${isOpen ? "opacity-0" : ""}`}
                   >
-                    {prog}/8
-                  </span>
+                    <span
+                      className={`text-[13px] font-black leading-tight ${status === "locked" ? "text-ink-faint" : "text-ink"}`}
+                    >
+                      {node.label}
+                    </span>
+                    <span className="mt-0.5 inline-flex items-center gap-1 text-[10px] font-extrabold text-ink-faint">
+                      <span
+                        className={`w-1.5 h-1.5 rounded-full ${STRAND_THEME[node.strand].dot}`}
+                      />
+                      {STRAND_META[node.strand].label} · {node.minutes}分
+                    </span>
+                  </div>
                 </div>
-                <div className="text-xs font-semibold mt-0.5">{sec.title}</div>
-              </button>
+
+                {isOpen && (
+                  <div
+                    className="absolute z-30"
+                    style={{ left: popLeft, top: y + size / 2 + 18 }}
+                  >
+                    <NodePopover
+                      node={node}
+                      status={status}
+                      color={section.color}
+                      arrowX={x - popLeft}
+                      onStart={() => onStart(node)}
+                    />
+                  </div>
+                )}
+              </div>
             );
           })}
         </div>
       </div>
 
-      <div
-        key={selectedSectionId}
-        className="bg-white rounded-2xl border border-slate-200/80 shadow-[0_1px_3px_rgba(0,0,0,0.03)] overflow-hidden animate-soft-pop"
-      >
-        <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between gap-4">
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="text-[11px] font-semibold tracking-wider text-indigo-600">
-                {currentSection.code}
-              </span>
-              <span className="text-slate-300">·</span>
-              <span className="text-[11px] text-slate-400">{currentSection.subtitle}</span>
-            </div>
-            <h2 className="text-base font-semibold text-slate-900 mt-0.5 tracking-tight">
-              {currentSection.title}
-            </h2>
-          </div>
-          <button
-            onClick={onOpenVocab}
-            className="shrink-0 inline-flex items-center gap-1 text-xs font-medium text-slate-600 hover:text-slate-900 px-3 py-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 transition"
-          >
-            <span>語彙一覧</span>
-            <ArrowUpRight className="w-3.5 h-3.5" />
-          </button>
+      {nextSection && (
+        <div className="flex items-center gap-3 py-2 text-xs font-extrabold text-ink-faint">
+          <span className="h-0.5 flex-1 rounded-full bg-line" />
+          次のユニット：{nextSection.title}
+          <span className="h-0.5 flex-1 rounded-full bg-line" />
         </div>
-
-        <div className="py-6 flex justify-center bg-gradient-to-b from-white to-slate-50/40">
-          <div className="relative" style={{ width: `${PATH_WIDTH}px`, height: `${totalPathHeight}px` }}>
-            <svg
-              viewBox={`0 0 ${PATH_WIDTH} ${totalPathHeight}`}
-              className="absolute inset-0 w-full h-full pointer-events-none"
-              fill="none"
-            >
-              {nodeCoords.map((pt, i) => {
-                if (i === nodeCoords.length - 1) return null;
-                const next = nodeCoords[i + 1];
-                const midY = (pt.y + next.y) / 2;
-                const d = `M ${pt.x} ${pt.y} C ${pt.x} ${midY}, ${next.x} ${midY}, ${next.x} ${next.y}`;
-                const stepCompleted = i + 1 <= doneCount;
-
-                return (
-                  <path
-                    key={i}
-                    d={d}
-                    stroke={stepCompleted ? '#4F46E5' : '#E2E8F0'}
-                    strokeWidth={stepCompleted ? '2' : '1.75'}
-                    strokeDasharray={stepCompleted ? undefined : '4 5'}
-                    strokeLinecap="round"
-                  />
-                );
-              })}
-            </svg>
-
-            {NODE_TEMPLATE.map((node, idx) => {
-              const isDone = node.step <= doneCount;
-              const isCurrent = node.step === doneCount + 1;
-              const isLocked = node.step > doneCount + 1;
-              const { x, y } = nodeCoords[idx];
-
-              let nodeCircleStyle =
-                'bg-slate-50 border border-slate-200 text-slate-300 cursor-not-allowed';
-              if (isDone) {
-                nodeCircleStyle =
-                  'bg-white border border-indigo-200 text-indigo-600 hover:border-indigo-400 shadow-xs';
-              } else if (isCurrent) {
-                nodeCircleStyle =
-                  'bg-indigo-600 border border-indigo-600 text-white shadow-md animate-subtle-pulse hover:bg-indigo-700';
-              }
-
-              return (
-                <div
-                  key={node.step}
-                  style={{
-                    left: `${x}px`,
-                    top: `${y}px`,
-                    transform: 'translate(-50%, -50%)',
-                  }}
-                  className="absolute flex flex-col items-center"
-                >
-                  {isCurrent && (
-                    <div className="absolute -top-8 bg-slate-900 text-white text-[10px] font-medium px-2.5 py-0.5 rounded-full shadow-sm whitespace-nowrap tracking-wide">
-                      NEXT
-                    </div>
-                  )}
-
-                  <button
-                    onClick={() => {
-                      if (!isLocked) setActiveNodeModal(node);
-                    }}
-                    aria-label={node.label}
-                    className={`w-12 h-12 rounded-full flex items-center justify-center transition-all ${nodeCircleStyle}`}
-                  >
-                    {isDone ? (
-                      <Check className="w-5 h-5 stroke-[2.2]" />
-                    ) : isLocked ? (
-                      <Lock className="w-4 h-4" />
-                    ) : node.icon === 'crown' ? (
-                      <Crown className="w-5 h-5" />
-                    ) : node.icon === 'headphones' ? (
-                      <Headphones className="w-5 h-5" />
-                    ) : node.icon === 'mic' ? (
-                      <Mic className="w-5 h-5" />
-                    ) : node.icon === 'pen' ? (
-                      <PenTool className="w-4 h-4" />
-                    ) : node.icon === 'zap' ? (
-                      <Zap className="w-5 h-5" />
-                    ) : node.icon === 'book' ? (
-                      <BookOpen className="w-4 h-4" />
-                    ) : (
-                      <Layers className="w-4 h-4" />
-                    )}
-                  </button>
-
-                  <div className="absolute top-14 flex flex-col items-center whitespace-nowrap">
-                    <span
-                      className={`text-xs font-medium tracking-tight ${
-                        isCurrent ? 'text-slate-900 font-semibold' : isDone ? 'text-slate-700' : 'text-slate-400'
-                      }`}
-                    >
-                      {node.label}
-                    </span>
-                    <span className="text-[10px] text-slate-400">{node.sub}</span>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      </div>
-
-      {activeNodeModal && (
-        <NodeDetailModal
-          node={activeNodeModal}
-          sectionCode={currentSection.code}
-          onClose={() => setActiveNodeModal(null)}
-          onComplete={() => {
-            onCompleteNode(activeNodeModal);
-            setActiveNodeModal(null);
-          }}
-        />
       )}
-    </div>
+    </section>
   );
 }

@@ -1,5 +1,8 @@
-import { ArrowRight } from 'lucide-react';
+import { ChevronRight, Layers, PenLine, Play } from 'lucide-react';
+import { DailyQuests, type QuestProgress } from '@/components/layout/DailyQuests';
+import { NODE_TEMPLATE, STRAND_META, TOTAL_STEPS } from '@/constants/curriculum';
 import { BotanicalCard } from '@/features/botanical';
+import { NODE_ICONS, THEME } from '@/lib/theme';
 import type { SectionData, TabType } from '@/types/lexis';
 
 type Props = {
@@ -7,6 +10,7 @@ type Props = {
   isWateredToday: boolean;
   currentSection: SectionData;
   doneCount: number;
+  quests: QuestProgress;
   onWaterPlant: () => void;
   onChangePlantDays: (days: number) => void;
   onNavigateTab: (tab: TabType) => void;
@@ -17,12 +21,65 @@ export function HomeTab({
   isWateredToday,
   currentSection,
   doneCount,
+  quests,
   onWaterPlant,
   onChangePlantDays,
   onNavigateTab,
 }: Props) {
+  const theme = THEME[currentSection.color];
+  const nextNode = NODE_TEMPLATE.find((n) => n.step === doneCount + 1);
+  const NextIcon = nextNode ? NODE_ICONS[nextNode.icon] : null;
+
   return (
     <div className="space-y-5 animate-soft-pop">
+      {/* つづきから */}
+      <section
+        className={`rounded-3xl ${theme.bg} text-white p-5 space-y-4`}
+        style={{ boxShadow: `0 5px 0 ${theme.chunk}` }}
+      >
+        <div className="flex items-start gap-4">
+          {NextIcon && (
+            <div
+              className="w-16 h-16 shrink-0 rounded-full bg-white/20 flex items-center justify-center"
+              style={{ boxShadow: 'inset 0 -4px 0 rgba(0,0,0,0.12)' }}
+            >
+              <NextIcon className="w-8 h-8" strokeWidth={2.6} />
+            </div>
+          )}
+          <div className="min-w-0 flex-1">
+            <div className="text-[11px] font-extrabold tracking-wider text-white/80">
+              ユニット {currentSection.unit} · {currentSection.title}
+            </div>
+            <h2 className="text-2xl font-black leading-tight mt-0.5">
+              {nextNode ? nextNode.label : 'ユニット修了！'}
+            </h2>
+            <p className="text-xs font-bold text-white/85 mt-1">
+              {nextNode
+                ? `${STRAND_META[nextNode.strand].label} · 約${nextNode.minutes}分 · ${nextNode.sub}`
+                : '次のユニットに進みましょう'}
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-3">
+          <div className="progress-track flex-1 bg-black/15">
+            <div className="progress-fill bg-white" style={{ width: `${(doneCount / TOTAL_STEPS) * 100}%` }} />
+          </div>
+          <span className="text-xs font-black tabular-nums">
+            {doneCount}/{TOTAL_STEPS}
+          </span>
+        </div>
+
+        <button
+          onClick={() => onNavigateTab('path')}
+          className={`btn-3d w-full py-3.5 text-base bg-white ${theme.textDark}`}
+          style={{ ['--chunk' as string]: 'rgba(0,0,0,0.18)' }}
+        >
+          <Play className="w-5 h-5 fill-current" />
+          つづきから
+        </button>
+      </section>
+
       <BotanicalCard
         plantDays={plantDays}
         isWateredToday={isWateredToday}
@@ -30,58 +87,73 @@ export function HomeTab({
         onChangePlantDays={onChangePlantDays}
       />
 
-      <section className="space-y-2.5">
-        <h2 className="text-xs font-medium text-slate-500 px-0.5">本日のトレーニング</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <button
+      <div className="xl:hidden">
+        <DailyQuests progress={quests} />
+      </div>
+
+      <section className="space-y-3">
+        <h2 className="text-base font-black text-ink px-0.5">今日のトレーニング</h2>
+        <div className="grid grid-cols-2 gap-3">
+          <TrainingTile
             onClick={() => onNavigateTab('cards')}
-            className="bg-white p-4 rounded-2xl border border-slate-200/80 hover:border-slate-300 text-left transition shadow-[0_1px_2px_rgba(0,0,0,0.02)] group"
-          >
-            <div className="flex items-center justify-between">
-              <span className="text-[11px] font-medium text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-md">
-                FSRS 復習
-              </span>
-              <ArrowRight className="w-3.5 h-3.5 text-slate-400 group-hover:translate-x-0.5 transition" />
-            </div>
-            <div className="mt-2.5 text-sm font-semibold text-slate-900">
-              14語のカードが期限です
-            </div>
-            <p className="text-[11px] text-slate-500 mt-0.5">受容・産出の想起スピードを測定</p>
-          </button>
-
-          <button
+            icon={<Layers className="w-7 h-7 text-white" strokeWidth={2.6} />}
+            iconBg="bg-grape"
+            chunk="var(--grape-dark)"
+            badge="FSRS 復習"
+            title="14枚が期限"
+            sub="受容・産出の想起スピード"
+          />
+          <TrainingTile
             onClick={() => onNavigateTab('writing')}
-            className="bg-white p-4 rounded-2xl border border-slate-200/80 hover:border-slate-300 text-left transition shadow-[0_1px_2px_rgba(0,0,0,0.02)] group"
-          >
-            <div className="flex items-center justify-between">
-              <span className="text-[11px] font-medium text-rose-600 bg-rose-50 px-2 py-0.5 rounded-md">
-                弱点ブレンド
-              </span>
-              <ArrowRight className="w-3.5 h-3.5 text-slate-400 group-hover:translate-x-0.5 transition" />
-            </div>
-            <div className="mt-2.5 text-sm font-semibold text-slate-900">1文マルチ和文英訳</div>
-            <p className="text-[11px] text-slate-500 mt-0.5">ターゲット：launch / obtain / funds</p>
-          </button>
+            icon={<PenLine className="w-7 h-7 text-white" strokeWidth={2.6} />}
+            iconBg="bg-berry"
+            chunk="var(--berry-dark)"
+            badge="弱点ブレンド"
+            title="1文マルチ和文英訳"
+            sub="launch / obtain / funds"
+          />
         </div>
-
-        <button
-          onClick={() => onNavigateTab('path')}
-          className="w-full bg-white p-4 rounded-2xl border border-slate-200/80 hover:border-slate-300 flex items-center justify-between text-left transition shadow-[0_1px_2px_rgba(0,0,0,0.02)] group"
-        >
-          <div className="space-y-0.5">
-            <div className="flex items-center gap-2 text-[11px]">
-              <span className="font-semibold text-slate-900">{currentSection.code}</span>
-              <span className="text-slate-300">·</span>
-              <span className="text-slate-500">進捗 {doneCount} / 8 Steps</span>
-            </div>
-            <div className="text-sm font-semibold text-slate-900">{currentSection.title}</div>
-          </div>
-          <span className="inline-flex items-center gap-1 text-xs font-medium text-indigo-600">
-            パスを続ける
-            <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition" />
-          </span>
-        </button>
       </section>
     </div>
+  );
+}
+
+function TrainingTile({
+  onClick,
+  icon,
+  iconBg,
+  chunk,
+  badge,
+  title,
+  sub,
+}: {
+  onClick: () => void;
+  icon: React.ReactNode;
+  iconBg: string;
+  chunk: string;
+  badge: string;
+  title: string;
+  sub: string;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className="btn-3d btn-white !items-start !justify-start flex-col text-left p-4 !gap-3 group"
+    >
+      <div className="w-full flex items-center justify-between">
+        <span
+          className={`w-12 h-12 rounded-2xl ${iconBg} flex items-center justify-center`}
+          style={{ boxShadow: `0 3px 0 ${chunk}` }}
+        >
+          {icon}
+        </span>
+        <ChevronRight className="w-5 h-5 text-ink-faint group-hover:translate-x-0.5 transition" />
+      </div>
+      <div className="space-y-0.5">
+        <div className="text-[11px] font-extrabold text-ink-faint">{badge}</div>
+        <div className="text-[15px] font-black text-ink leading-snug">{title}</div>
+        <div className="text-[11px] font-bold text-ink-soft">{sub}</div>
+      </div>
+    </button>
   );
 }

@@ -144,7 +144,7 @@ export function RealisticBotanicalCanvas({
 
   return (
     <div
-      className="relative w-full rounded-2xl overflow-hidden border border-slate-200/80 transition-colors duration-700"
+      className="relative w-full rounded-2xl overflow-hidden transition-colors duration-700"
       style={{
         background: `linear-gradient(180deg, ${env.skyFrom} 0%, ${env.skyTo} 100%)`,
       }}
