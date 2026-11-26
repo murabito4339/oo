@@ -27,6 +27,14 @@ export function tintForTime(
   return nightFactor > 0 ? lerpColor(hex, nightTarget, nightFactor * strength) : hex;
 }
 
+/**
+ * 世代ごとの木の位置。木は一生のあいだ動かず、次の世代は前の木の切り株の隣から芽吹く。
+ */
+export function getTreeBaseX(cycle: number) {
+  if (cycle <= 1) return 260;
+  return cycle % 2 === 0 ? 278 : 242;
+}
+
 export function getDayOfYear(date: Date): number {
   const start = new Date(date.getFullYear(), 0, 0);
   const diff =

@@ -1,8 +1,9 @@
 'use client';
 
+import type { CSSProperties } from 'react';
 import { BotanicalTree } from './botanicalTree/BotanicalTree';
 import type { EnvironmentState, SpeciesConfig } from './types';
-import { clamp, lerp, tintForTime } from './utils';
+import { clamp, getTreeBaseX, lerp, lerpColor, tintForTime } from './utils';
 
 type Props = {
   days: number;
@@ -12,66 +13,39 @@ type Props = {
   treeBaseX: number;
 };
 
-/** 前のサイクルの木が立っていた位置（2代目以降の treeBaseX は cd360 で 260 に戻る） */
-const PREVIOUS_TREE_X = 260;
+const COTYLEDON_L = 'M0 0 C-7 -7, -18 -5, -19 0 C-16 5, -5 4, 0 0 Z';
+const COTYLEDON_R = 'M0 0 C7 -7, 18 -5, 19 0 C16 5, 5 4, 0 0 Z';
+/** 双葉が落ちる日（左・右） */
+const COTYLEDON_DROP = [33, 36];
+
+type CSSVars = CSSProperties & Record<`--${string}`, string>;
 
 export function TreeLayer({ days, species, env, isWateredToday, treeBaseX }: Props) {
   const cycle = days === 0 ? 1 : Math.floor((days - 1) / 360) + 1;
   const cd = days === 0 ? 0 : ((days - 1) % 360) + 1;
   const isSecondGen = cycle >= 2;
+  const prevTreeX = getTreeBaseX(cycle - 1);
+  // 2 代目以降の芽は、切り株から離れる向きに少し傾いて伸びる
+  const lean = isSecondGen ? Math.sign(treeBaseX - prevTreeX) * 4 : 0;
 
-  // 芽（cd1〜23）から木（cd24〜）へは 10 日かけてクロスフェードする
-  const isSproutVisible = days >= 1 && cd <= 33;
-  const sproutOpacity = cd <= 23 ? 1 : clamp(1 - (cd - 23) / 10, 0, 1);
-  const treeOpacity = clamp((cd - 23) / 8, 0, 1);
-
+  const isSproutPhase = days >= 1 && cd <= 23;
   const sproutG = clamp((cd - 1) / 22, 0, 1);
   const sproutH = lerp(8, 46, Math.pow(sproutG, 0.85));
   const sproutWave = Math.sin(sproutG * Math.PI * 2.1) * 4.5 * Math.sin(sproutG * Math.PI);
   const sproutHook = cd <= 10 ? lerp(8, 0, clamp((cd - 1) / 9, 0, 1)) : 0;
   const swayClass = 'mountain-tree-sway';
 
-  // 前の世代の木：位置を変えずに、葉も含めて 2 週間かけて薄れていく
-  const oldTreeOpacity = isSecondGen ? clamp(1 - (cd - 1) / 13, 0, 1) * 0.92 : 0;
-  const oldStumpOpacity = isSecondGen ? clamp(1 - (cd - 42) / 33, 0, 1) : 0;
+  // 若木になった後も双葉はしばらく残り、黄色くなってから 1 枚ずつ落ちる
+  const cotyledonAge = clamp((cd - 24) / 9, 0, 1);
+  const cotyledonFill = tintForTime(lerpColor(species.sproutColors.cotyledon, '#C9A227', cotyledonAge), env.nightFactor, '#355678', 0.62);
+  const cotyledonStroke = tintForTime(lerpColor(species.sproutColors.cotyledonStroke, '#8A6A1E', cotyledonAge), env.nightFactor, '#16283E', 0.68);
 
   return (
     <g>
-      {oldTreeOpacity > 0.02 && (
-        <g transform={`translate(${PREVIOUS_TREE_X}, 253)`} opacity={oldTreeOpacity}>
-          <BotanicalTree species={species} cd={360} env={env} isWateredToday={false} animate={false} />
-        </g>
-      )}
-
-      {isSecondGen && oldStumpOpacity > 0.02 && (
-        <g transform="translate(255, 253)" opacity={oldStumpOpacity}>
-          <path
-            d="M -14 3 C -8.5 0.5, -7 -7, -6 -17 L -2 -19 L 2 -15.5 L 5.8 -18 C 7 -7.5, 8.5 0.5, 13.5 3 Z"
-            fill="url(#oldTrunkGrad)"
-          />
-          <path
-            d="M -2 -3 Q -3 -9.5 -1 -15 M 2 -2 Q 3 -8.5 2 -14"
-            stroke="#3F3934"
-            strokeWidth="0.9"
-            strokeOpacity="0.45"
-            strokeLinecap="round"
-          />
-          {cd >= 4 && (
-            <g
-              fill={tintForTime('#65A30D', env.nightFactor, '#1E3A5F', 0.62)}
-              opacity={clamp((cd - 4) / 14, 0.25, 0.85)}
-            >
-              <ellipse cx="-5" cy="-6.5" rx="3.2" ry="4.4" />
-              <ellipse cx="4.2" cy="-4.8" rx="2.6" ry="3.6" />
-              <ellipse
-                cx="-1.5"
-                cy="-15.5"
-                rx="2.5"
-                ry="1.7"
-                fill={tintForTime('#84CC16', env.nightFactor, '#335275', 0.6)}
-              />
-            </g>
-          )}
+      {isSecondGen && (
+        // 前の世代の木：その場で葉と枝を落とし、苔むした切り株になって土に還っていく
+        <g transform={`translate(${prevTreeX}, 253)`}>
+          <BotanicalTree species={species} cd={360} env={env} isWateredToday={false} decayDay={Math.max(1, cd)} />
         </g>
       )}
 
@@ -87,19 +61,19 @@ export function TreeLayer({ days, species, env, isWateredToday, treeBaseX }: Pro
         </g>
       )}
 
-      {isSproutVisible && (
-        <g transform={`translate(${treeBaseX.toFixed(1)}, 253)`} opacity={sproutOpacity}>
+      {isSproutPhase && (
+        <g transform={`translate(${treeBaseX.toFixed(1)}, 253)`}>
           <g className={swayClass}>
             <path
               d={`M -1.6 0 Q ${(-2 + sproutWave).toFixed(1)} ${(-sproutH * 0.5).toFixed(1)}, ${(
-                (isSecondGen ? 4 : 0) + sproutHook * 0.5
+                lean + sproutHook * 0.5
               ).toFixed(1)} ${(-sproutH).toFixed(1)}
-              L ${((isSecondGen ? 4 : 0) + 1.4 + sproutHook * 0.5).toFixed(1)} ${(-sproutH).toFixed(1)}
+              L ${(lean + 1.4 + sproutHook * 0.5).toFixed(1)} ${(-sproutH).toFixed(1)}
               Q ${(1.2 + sproutWave).toFixed(1)} ${(-sproutH * 0.5).toFixed(1)}, 1.6 0 Z`}
               fill={tintForTime(species.sproutColors.stem, env.nightFactor, '#1E3A5F', 0.62)}
             />
             <g
-              transform={`translate(${((isSecondGen ? 2 : 0) + sproutWave * 0.5).toFixed(1)}, ${(
+              transform={`translate(${(lean * 0.5 + sproutWave * 0.5).toFixed(1)}, ${(
                 -sproutH * 0.48
               ).toFixed(1)}) rotate(${sproutHook * 3.5})`}
             >
@@ -118,7 +92,7 @@ export function TreeLayer({ days, species, env, isWateredToday, treeBaseX }: Pro
             </g>
             {cd >= 8 && (
               <g
-                transform={`translate(${((isSecondGen ? 4 : 0) + sproutHook * 0.5).toFixed(1)}, ${(
+                transform={`translate(${(lean + sproutHook * 0.5).toFixed(1)}, ${(
                   -sproutH
                 ).toFixed(1)}) scale(${clamp((cd - 7) / 14, 0.3, 1)})`}
               >
@@ -147,9 +121,38 @@ export function TreeLayer({ days, species, env, isWateredToday, treeBaseX }: Pro
       )}
 
       {days >= 1 && cd >= 24 && (
-        <g transform={`translate(${treeBaseX.toFixed(1)}, 253)`} opacity={treeOpacity}>
+        <g transform={`translate(${treeBaseX.toFixed(1)}, 253)`}>
           <g className={swayClass}>
             <BotanicalTree species={species} cd={cd} env={env} isWateredToday={isWateredToday} />
+            {COTYLEDON_DROP.map((dropDay, i) => {
+              const d = i === 0 ? COTYLEDON_L : COTYLEDON_R;
+              if (cd < dropDay) {
+                // 枝に付いたまま、だんだん垂れ下がる
+                const droop = (i === 0 ? -1 : 1) * cotyledonAge * 28;
+                return (
+                  <path
+                    key={i}
+                    d={d}
+                    transform={`translate(0 -20) rotate(${droop.toFixed(1)}) scale(${(1 - cotyledonAge * 0.15).toFixed(2)})`}
+                    fill={cotyledonFill}
+                    stroke={cotyledonStroke}
+                    strokeWidth="0.6"
+                  />
+                );
+              }
+              if (cd - dropDay > 1) return null;
+              const fall: CSSVars = { animationDuration: '8s', animationDelay: `${-i * 3}s`, '--drop': '22px', '--drift': i === 0 ? '-10px' : '10px' };
+              const flip: CSSVars = { animationDuration: '1.9s', '--spin': '70deg' };
+              return (
+                <g key={i} transform="translate(0 -20)" className="fallers">
+                  <g className="fall-flutter" style={fall}>
+                    <g className="fall-flip" style={flip}>
+                      <path d={d} transform={`translate(${i === 0 ? 9 : -9} 0)`} fill={cotyledonFill} stroke={cotyledonStroke} strokeWidth="0.6" />
+                    </g>
+                  </g>
+                </g>
+              );
+            })}
           </g>
         </g>
       )}

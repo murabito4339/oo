@@ -8,7 +8,7 @@ import { getSpeciesConfig } from './species';
 import { TreeLayer } from './TreeLayer';
 import { buildSeagullPath } from './treeGeometry';
 import type { SeagullAgent, SpeciesId } from './types';
-import { clamp, getGrowthStageMeta, getSeasonFromDate, lerp, tintForTime } from './utils';
+import { clamp, getGrowthStageMeta, getSeasonFromDate, getTreeBaseX, tintForTime } from './utils';
 
 type Props = {
   days: number;
@@ -45,8 +45,8 @@ export function RealisticBotanicalCanvas({
 
   const cycle = days === 0 ? 1 : Math.floor((days - 1) / 360) + 1;
   const cd = days === 0 ? 0 : ((days - 1) % 360) + 1;
-  const isSecondGen = cycle >= 2;
-  const treeBaseX = isSecondGen ? lerp(268, 260, clamp((cd - 45) / 65, 0, 1)) : 260;
+  // 木は一生同じ場所に立ち、次の世代は切り株の隣から芽吹く
+  const treeBaseX = getTreeBaseX(cycle);
   const bark = species.getBarkPalette(cd, env);
 
   const gullGroupRefs = useRef<(SVGGElement | null)[]>([]);
@@ -196,11 +196,60 @@ export function RealisticBotanicalCanvas({
           animation-timing-function: ease-in-out;
           animation-iteration-count: infinite;
         }
+        /* 落ちていくもの：外側が道すじ、内側が舞い方 */
+        @keyframes fallFlutter {
+          0% { transform: translate(0px, 0px); opacity: 0; }
+          6% { opacity: 1; }
+          18% { transform: translate(calc(var(--drift) * 0.55), calc(var(--drop) * 0.14)); }
+          34% { transform: translate(calc(var(--drift) * -0.35), calc(var(--drop) * 0.32)); }
+          50% { transform: translate(calc(var(--drift) * 0.45), calc(var(--drop) * 0.5)); }
+          66% { transform: translate(calc(var(--drift) * -0.25), calc(var(--drop) * 0.68)); }
+          80% { transform: translate(calc(var(--drift) * 0.2), var(--drop)); }
+          90% { transform: translate(calc(var(--drift) * 0.2), var(--drop)); opacity: 1; }
+          100% { transform: translate(calc(var(--drift) * 0.2), var(--drop)); opacity: 0; }
+        }
+        @keyframes fallFlip {
+          0%, 100% { transform: rotate(calc(var(--spin) * -0.5)) scaleX(1); }
+          25% { transform: rotate(0deg) scaleX(0.3); }
+          50% { transform: rotate(calc(var(--spin) * 0.5)) scaleX(-1); }
+          75% { transform: rotate(0deg) scaleX(0.3); }
+        }
+        @keyframes fallDrop {
+          0% { transform: translate(0px, 0px); opacity: 0; animation-timing-function: ease-in; }
+          3% { opacity: 1; }
+          26% { transform: translate(var(--drift), var(--drop)); }
+          86% { transform: translate(var(--drift), var(--drop)); opacity: 1; }
+          100% { transform: translate(var(--drift), var(--drop)); opacity: 0; }
+        }
+        @keyframes fallTumble {
+          0% { transform: rotate(0deg); animation-timing-function: ease-in; }
+          26%, 100% { transform: rotate(var(--spin)); }
+        }
+        @keyframes fallSpinPath {
+          0% { transform: translate(0px, 0px); opacity: 0; }
+          5% { opacity: 1; }
+          70% { transform: translate(var(--drift), var(--drop)); }
+          90% { transform: translate(var(--drift), var(--drop)); opacity: 1; }
+          100% { transform: translate(var(--drift), var(--drop)); opacity: 0; }
+        }
+        @keyframes fallWhirl {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(var(--spin)); }
+        }
+        .fall-flutter { animation: fallFlutter 8s ease-in-out infinite; }
+        .fall-flip { animation: fallFlip 2s ease-in-out infinite; }
+        .fall-drop { animation: fallDrop 10s linear infinite; }
+        .fall-tumble { animation: fallTumble 10s linear infinite; }
+        .fall-spin-path { animation: fallSpinPath 8s linear infinite; }
+        .fall-whirl { animation: fallWhirl 0.6s linear infinite; }
         @media (prefers-reduced-motion: reduce) {
           .mountain-tree-sway,
           .leaf-sway,
           .leaf-flutter {
             animation: none;
+          }
+          .fallers {
+            display: none;
           }
         }
         .mist-drift {
