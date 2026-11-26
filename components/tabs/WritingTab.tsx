@@ -1,146 +1,160 @@
 'use client';
 
 import { useState } from 'react';
-import { AlertCircle, Lightbulb, Volume2 } from 'lucide-react';
+import { CircleAlert, Lightbulb, Volume2 } from 'lucide-react';
+import { Sprout } from '@/components/ui/Sprout';
 
-export function WritingTab() {
+type Props = {
+  onCheck?: () => void;
+};
+
+export function WritingTab({ onCheck }: Props) {
   const [writingMode, setWritingMode] = useState<'translation' | 'free'>('translation');
-  const [showDiffMock, setShowDiffMock] = useState(true);
+  const [showFeedback, setShowFeedback] = useState(false);
   const [hintLevel, setHintLevel] = useState(0);
+
+  const prompt =
+    writingMode === 'translation'
+      ? 'そのチームはスポンサーから新たな資金を獲得したので、その事業に着手した。'
+      : 'What does it mean for a society to support young researchers? Write 60–80 words.';
 
   return (
     <div className="space-y-5 animate-soft-pop">
-      <div className="inline-flex w-full bg-slate-200/70 p-1 rounded-xl">
-        <button
-          onClick={() => setWritingMode('translation')}
-          className={`flex-1 py-2 rounded-lg text-xs font-medium transition ${
-            writingMode === 'translation'
-              ? 'bg-white text-slate-900 shadow-xs'
-              : 'text-slate-500 hover:text-slate-700'
-          }`}
-        >
-          1文和文英訳（マルチ語彙）
-        </button>
-        <button
-          onClick={() => setWritingMode('free')}
-          className={`flex-1 py-2 rounded-lg text-xs font-medium transition ${
-            writingMode === 'free'
-              ? 'bg-white text-slate-900 shadow-xs'
-              : 'text-slate-500 hover:text-slate-700'
-          }`}
-        >
-          自由英作文（論述実践）
-        </button>
+      <div className="grid grid-cols-2 gap-3">
+        {(
+          [
+            { id: 'translation', label: '和文英訳', sub: '1文・マルチ語彙' },
+            { id: 'free', label: '自由英作文', sub: '論述実践' },
+          ] as const
+        ).map((m) => {
+          const active = writingMode === m.id;
+          return (
+            <button
+              key={m.id}
+              onClick={() => {
+                setWritingMode(m.id);
+                setShowFeedback(false);
+                setHintLevel(0);
+              }}
+              aria-pressed={active}
+              className={`btn-3d py-2.5 text-sm flex-col !gap-0 ${
+                active ? 'bg-berry-light text-berry-dark border-2 border-berry' : 'btn-white'
+              }`}
+              style={active ? { ['--chunk' as string]: 'var(--berry)' } : undefined}
+            >
+              <span>{m.label}</span>
+              <span className="text-[11px] font-bold opacity-75">{m.sub}</span>
+            </button>
+          );
+        })}
       </div>
 
-      <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-[0_1px_3px_rgba(0,0,0,0.03)] space-y-4">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <span className="text-[11px] font-medium px-2 py-0.5 rounded-md bg-slate-100 text-slate-700">
-            {writingMode === 'translation'
-              ? 'Target: launch / obtain / funds'
-              : '難関大形式 · 60–80 words'}
-          </span>
-          <span className="text-[11px] font-medium text-rose-600 bg-rose-50 px-2 py-0.5 rounded-md border border-rose-200/60">
-            弱点フォーカス: 他動詞の語法
-          </span>
+      <h1 className="text-2xl font-black text-ink">
+        {writingMode === 'translation' ? 'この文を英語にしよう' : 'このテーマで書いてみよう'}
+      </h1>
+
+      {/* マスコット＋吹き出しのお題 */}
+      <div className="flex items-end gap-3">
+        <Sprout size={84} className="shrink-0" />
+        <div className="relative flex-1 rounded-2xl border-2 border-line px-4 py-3">
+          <span className="absolute -left-[9px] bottom-6 w-4 h-4 rotate-45 bg-white border-l-2 border-b-2 border-line" />
+          <p className="relative text-[15px] font-bold leading-relaxed text-ink">{prompt}</p>
         </div>
-
-        <p className="font-medium text-[15px] text-slate-900 leading-relaxed">
-          {writingMode === 'translation'
-            ? 'そのチームはスポンサーから新たな資金を獲得したので、その事業に着手した。'
-            : 'What does it mean for a society to support young researchers? Write 60–80 words.'}
-        </p>
-
-        <div className="flex flex-wrap gap-2">
-          <button
-            onClick={() => setHintLevel((h) => (h === 1 ? 0 : 1))}
-            className={`text-xs font-medium px-2.5 py-1.5 rounded-lg border inline-flex items-center gap-1.5 transition ${
-              hintLevel === 1
-                ? 'bg-indigo-50 border-indigo-200 text-indigo-700'
-                : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
-            }`}
-          >
-            <Lightbulb className="w-3.5 h-3.5" />
-            ヒント 1：頭文字
-          </button>
-          <button
-            onClick={() => setHintLevel((h) => (h === 2 ? 0 : 2))}
-            className={`text-xs font-medium px-2.5 py-1.5 rounded-lg border inline-flex items-center gap-1.5 transition ${
-              hintLevel === 2
-                ? 'bg-indigo-50 border-indigo-200 text-indigo-700'
-                : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
-            }`}
-          >
-            <Lightbulb className="w-3.5 h-3.5" />
-            ヒント 2：語法
-          </button>
-        </div>
-
-        {hintLevel === 1 && (
-          <div className="text-xs bg-slate-50 border border-slate-200/70 px-3 py-2 rounded-lg text-slate-700 font-mono">
-            l_____ / o_____ / f____
-          </div>
-        )}
-        {hintLevel === 2 && (
-          <div className="text-xs bg-slate-50 border border-slate-200/70 px-3 py-2 rounded-lg text-slate-600">
-            「〜に着手する」の launch は他動詞のため、前置詞 into は不要です。
-          </div>
-        )}
-
-        <textarea
-          rows={3}
-          defaultValue="The team launched into the project, since they obtained new fund from the sponsors."
-          className="w-full p-3.5 rounded-xl border border-slate-200 text-sm text-slate-800 leading-relaxed focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/10 transition"
-        />
-
-        <button
-          onClick={() => setShowDiffMock(true)}
-          className="w-full py-2.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-medium rounded-xl transition"
-        >
-          最小修正 AI添削を実行
-        </button>
       </div>
 
-      {showDiffMock && (
-        <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-[0_1px_3px_rgba(0,0,0,0.03)] space-y-4 animate-soft-pop">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-900">添削フィードバック</span>
-            <button className="inline-flex items-center gap-1.5 text-xs font-medium text-indigo-600 hover:text-indigo-700 px-2.5 py-1 rounded-lg bg-indigo-50/70 transition">
-              <Volume2 className="w-3.5 h-3.5" />
-              モデル英文を再生
+      <div className="flex flex-wrap items-center gap-2 text-[11px] font-extrabold">
+        <span className="rounded-lg bg-cloud text-ink-soft px-2 py-1">
+          {writingMode === 'translation' ? 'Target: launch / obtain / funds' : '難関大形式 · 60–80 words'}
+        </span>
+        <span className="rounded-lg bg-berry-light text-berry-dark px-2 py-1">弱点フォーカス：他動詞の語法</span>
+      </div>
+
+      <div className="flex flex-wrap gap-2">
+        {[
+          { level: 1, label: 'ヒント1：頭文字' },
+          { level: 2, label: 'ヒント2：語法' },
+        ].map((h) => (
+          <button
+            key={h.level}
+            onClick={() => setHintLevel((cur) => (cur === h.level ? 0 : h.level))}
+            aria-pressed={hintLevel === h.level}
+            className={`btn-3d px-3 py-2 text-xs ${
+              hintLevel === h.level ? 'bg-sun-light text-sun-dark border-2 border-sun' : 'btn-white'
+            }`}
+            style={hintLevel === h.level ? { ['--chunk' as string]: 'var(--sun)' } : undefined}
+          >
+            <Lightbulb className="w-4 h-4 text-sun" />
+            {h.label}
+          </button>
+        ))}
+      </div>
+
+      {hintLevel === 1 && (
+        <div className="rounded-2xl bg-sun-light px-4 py-3 text-sm font-black text-sun-dark font-mono animate-soft-pop">
+          l_____ / o_____ / f____
+        </div>
+      )}
+      {hintLevel === 2 && (
+        <div className="rounded-2xl bg-sun-light px-4 py-3 text-xs font-bold text-sun-dark animate-soft-pop">
+          「〜に着手する」の launch は他動詞のため、前置詞 into は不要です。
+        </div>
+      )}
+
+      <textarea
+        rows={4}
+        defaultValue="The team launched into the project, since they obtained new fund from the sponsors."
+        className="w-full rounded-2xl border-2 border-line bg-cloud p-4 text-[15px] font-bold text-ink leading-relaxed focus:outline-none focus:border-sky focus:bg-white transition"
+      />
+
+      {!showFeedback && (
+        <button
+          onClick={() => {
+            setShowFeedback(true);
+            onCheck?.();
+          }}
+          className="btn-3d btn-leaf w-full py-4 text-base"
+        >
+          チェックする
+        </button>
+      )}
+
+      {showFeedback && (
+        <section className="rounded-3xl bg-berry-light p-5 space-y-4 animate-pop-in">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2 text-berry-dark">
+              <CircleAlert className="w-7 h-7" strokeWidth={2.6} />
+              <span className="text-lg font-black whitespace-nowrap">おしい！ 修正2か所</span>
+            </div>
+            <button className="btn-3d btn-white px-3 py-1.5 text-xs whitespace-nowrap shrink-0">
+              <Volume2 className="w-4 h-4 text-sky" />
+              モデル文
             </button>
           </div>
 
-          <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200/60 text-sm leading-relaxed text-slate-800">
+          <div className="rounded-2xl bg-white p-4 text-[15px] font-bold leading-relaxed text-ink">
             The team launched{' '}
-            <span className="line-through text-rose-600 bg-rose-50 px-1 rounded">into</span>{' '}
-            the project, since they{' '}
-            <span className="bg-indigo-50 text-indigo-700 border-b border-indigo-300 px-1 rounded-t font-medium">
-              obtained
-            </span>{' '}
-            new{' '}
-            <span className="line-through text-rose-600 bg-rose-50 px-1 rounded">fund</span>{' '}
-            <span className="text-emerald-700 font-medium bg-emerald-50 px-1 rounded">funds</span>{' '}
-            from the sponsors.
+            <span className="line-through decoration-2 text-berry bg-berry-light px-1 rounded">into</span> the project,
+            since they{' '}
+            <span className="bg-sky-light text-sky-dark border-b-2 border-sky px-1 rounded-t">obtained</span> new{' '}
+            <span className="line-through decoration-2 text-berry bg-berry-light px-1 rounded">fund</span>{' '}
+            <span className="text-leaf-dark bg-leaf-light px-1 rounded">funds</span> from the sponsors.
           </div>
 
-          <div className="space-y-2 text-xs">
-            <div className="p-3 bg-slate-50/70 border border-slate-200/60 rounded-xl flex items-start gap-2.5 text-slate-600">
-              <AlertCircle className="w-4 h-4 text-rose-500 shrink-0 mt-0.5" />
-              <div>
-                <span className="font-semibold text-slate-800">他動詞の語法：</span>
-                launch は他動詞のため前置詞 into は不要です（ErrorLogに自動記録）。
-              </div>
-            </div>
-            <div className="p-3 bg-slate-50/70 border border-slate-200/60 rounded-xl flex items-start gap-2.5 text-slate-600">
-              <AlertCircle className="w-4 h-4 text-rose-500 shrink-0 mt-0.5" />
-              <div>
-                <span className="font-semibold text-slate-800">可算・不可算：</span>
-                「資金」の意味で用いる場合、複数形 funds にするのが自然です。
-              </div>
-            </div>
-          </div>
-        </div>
+          <ul className="space-y-2 text-xs font-bold text-ink-soft">
+            <li className="rounded-2xl bg-white/70 p-3">
+              <span className="font-black text-berry-dark">他動詞の語法：</span>
+              launch は他動詞のため前置詞 into は不要です（ErrorLog に自動記録）。
+            </li>
+            <li className="rounded-2xl bg-white/70 p-3">
+              <span className="font-black text-berry-dark">可算・不可算：</span>
+              「資金」の意味では複数形 funds にするのが自然です。
+            </li>
+          </ul>
+
+          <button onClick={() => setShowFeedback(false)} className="btn-3d btn-berry w-full py-3.5 text-base">
+            書き直す
+          </button>
+        </section>
       )}
     </div>
   );

@@ -1,14 +1,74 @@
 @import "tailwindcss";
 
+/*
+ * Lexis Lab — playful design tokens
+ * 丸ゴシック + 明るい原色 + 「押せる」立体ボタン（下に4pxの影）で、
+ * Duolingo 的な手触りを出す。色はすべてここで定義し、Tailwind の
+ * bg-leaf / text-sky-dark / border-line などとして使う。
+ */
 :root {
-  --background: #f8f9fb;
-  --foreground: #0f172a;
+  --background: #ffffff;
+  --foreground: #3c4a57;
+
+  --leaf: #58c322;
+  --leaf-dark: #43a012;
+  --leaf-light: #e3f8d6;
+
+  --sky: #1ea7f0;
+  --sky-dark: #1287c7;
+  --sky-light: #ddf3ff;
+
+  --sun: #ffb020;
+  --sun-dark: #e08e00;
+  --sun-light: #fff1d1;
+
+  --berry: #ff5a5f;
+  --berry-dark: #db3b41;
+  --berry-light: #ffe3e3;
+
+  --grape: #a66cff;
+  --grape-dark: #8549e6;
+  --grape-light: #f1e8ff;
+
+  --flame: #ff8a1f;
+
+  --ink: #3c4a57;
+  --ink-soft: #7c8894;
+  --ink-faint: #aab3bc;
+  --line: #e4e8ec;
+  --line-dark: #ced5dc;
+  --cloud: #f5f7f9;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-plus-jakarta), var(--font-noto-sans-jp), -apple-system, BlinkMacSystemFont, sans-serif;
+
+  --color-leaf: var(--leaf);
+  --color-leaf-dark: var(--leaf-dark);
+  --color-leaf-light: var(--leaf-light);
+  --color-sky: var(--sky);
+  --color-sky-dark: var(--sky-dark);
+  --color-sky-light: var(--sky-light);
+  --color-sun: var(--sun);
+  --color-sun-dark: var(--sun-dark);
+  --color-sun-light: var(--sun-light);
+  --color-berry: var(--berry);
+  --color-berry-dark: var(--berry-dark);
+  --color-berry-light: var(--berry-light);
+  --color-grape: var(--grape);
+  --color-grape-dark: var(--grape-dark);
+  --color-grape-light: var(--grape-light);
+  --color-flame: var(--flame);
+  --color-ink: var(--ink);
+  --color-ink-soft: var(--ink-soft);
+  --color-ink-faint: var(--ink-faint);
+  --color-line: var(--line);
+  --color-line-dark: var(--line-dark);
+  --color-cloud: var(--cloud);
+
+  --font-sans: var(--font-nunito), var(--font-rounded), "Nunito", "M PLUS Rounded 1c",
+    var(--font-noto-sans-jp), -apple-system, BlinkMacSystemFont, sans-serif;
   --font-mono: var(--font-jetbrains-mono), monospace;
 }
 
@@ -18,6 +78,132 @@ body {
   font-feature-settings: "palt";
 }
 
+/* ---------- 立体ボタン ---------- */
+.btn-3d {
+  --chunk: var(--line-dark);
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border-radius: 1rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  box-shadow: 0 4px 0 var(--chunk);
+  transition:
+    transform 80ms ease-out,
+    box-shadow 80ms ease-out,
+    filter 150ms ease,
+    background-color 150ms ease;
+  user-select: none;
+}
+.btn-3d:hover {
+  filter: brightness(1.05);
+}
+.btn-3d:active {
+  transform: translateY(4px);
+  box-shadow: 0 0 0 var(--chunk);
+}
+.btn-3d:disabled {
+  cursor: not-allowed;
+  filter: grayscale(0.4) opacity(0.6);
+  transform: none;
+}
+.btn-3d:focus-visible {
+  outline: 3px solid var(--sky);
+  outline-offset: 3px;
+}
+
+.btn-leaf {
+  background: var(--leaf);
+  color: #fff;
+  --chunk: var(--leaf-dark);
+}
+.btn-sky {
+  background: var(--sky);
+  color: #fff;
+  --chunk: var(--sky-dark);
+}
+.btn-sun {
+  background: var(--sun);
+  color: #fff;
+  --chunk: var(--sun-dark);
+}
+.btn-berry {
+  background: var(--berry);
+  color: #fff;
+  --chunk: var(--berry-dark);
+}
+.btn-grape {
+  background: var(--grape);
+  color: #fff;
+  --chunk: var(--grape-dark);
+}
+.btn-white {
+  background: #fff;
+  color: var(--ink);
+  border: 2px solid var(--line);
+  --chunk: var(--line);
+}
+.btn-white:hover {
+  background: var(--cloud);
+  filter: none;
+}
+
+/* パスのノード（影を厚めに） */
+.node-3d {
+  --chunk: var(--line-dark);
+  box-shadow: 0 7px 0 var(--chunk);
+  transition:
+    transform 90ms ease-out,
+    box-shadow 90ms ease-out,
+    filter 150ms ease;
+}
+.node-3d:hover {
+  filter: brightness(1.06);
+}
+.node-3d:active {
+  transform: translateY(7px);
+  box-shadow: 0 0 0 var(--chunk);
+}
+.node-3d:focus-visible {
+  outline: 3px solid var(--sky);
+  outline-offset: 6px;
+}
+
+/* 枠つきカード：下辺だけ太くして「置いてある」感を出す */
+.card-3d {
+  background: #fff;
+  border: 2px solid var(--line);
+  border-bottom-width: 4px;
+  border-radius: 1.25rem;
+}
+
+/* 丸い進捗バー */
+.progress-track {
+  height: 0.875rem;
+  border-radius: 999px;
+  background: var(--line);
+  overflow: hidden;
+}
+.progress-fill {
+  height: 100%;
+  border-radius: 999px;
+  position: relative;
+  transition: width 500ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.progress-fill::after {
+  content: "";
+  position: absolute;
+  left: 0.5rem;
+  right: 0.5rem;
+  top: 3px;
+  height: 3px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.35);
+}
+
+/* ---------- アニメーション ---------- */
 @keyframes softPop {
   0% {
     opacity: 0;
@@ -29,21 +215,50 @@ body {
   }
 }
 
-@keyframes subtlePulse {
-  0%, 100% {
-    box-shadow: 0 0 0 0 rgba(79, 70, 229, 0.22);
+@keyframes popIn {
+  0% {
+    opacity: 0;
+    transform: scale(0.9) translateY(-4px);
   }
-  50% {
-    box-shadow: 0 0 0 8px rgba(79, 70, 229, 0);
+  60% {
+    opacity: 1;
+    transform: scale(1.02) translateY(0);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
   }
 }
 
-@keyframes gentleBreeze {
-  0%, 100% {
-    transform: rotate(-0.8deg);
+@keyframes bobble {
+  0%,
+  100% {
+    transform: translate(-50%, 0);
   }
   50% {
-    transform: rotate(0.9deg);
+    transform: translate(-50%, -5px);
+  }
+}
+
+@keyframes ringPulse {
+  0%,
+  100% {
+    opacity: 0.55;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.2;
+    transform: scale(1.08);
+  }
+}
+
+@keyframes flicker {
+  0%,
+  100% {
+    transform: scale(1) rotate(0deg);
+  }
+  50% {
+    transform: scale(1.08) rotate(-3deg);
   }
 }
 
@@ -51,11 +266,33 @@ body {
   animation: softPop 0.24s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
-.animate-subtle-pulse {
-  animation: subtlePulse 2.4s ease-in-out infinite;
+.animate-pop-in {
+  animation: popIn 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
-.animate-breeze {
-  transform-origin: 180px 266px;
-  animation: gentleBreeze 6s ease-in-out infinite;
+.animate-bobble {
+  animation: bobble 1.6s ease-in-out infinite;
+}
+
+.animate-ring-pulse {
+  animation: ringPulse 2s ease-in-out infinite;
+}
+
+.animate-flicker {
+  animation: flicker 1.8s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-bobble,
+  .animate-ring-pulse,
+  .animate-flicker {
+    animation: none;
+  }
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  scrollbar-width: none;
 }

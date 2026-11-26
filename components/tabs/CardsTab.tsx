@@ -1,114 +1,182 @@
 'use client';
 
 import { useState } from 'react';
-import { Bookmark, Clock, Volume2 } from 'lucide-react';
+import { Bookmark, Clock, Eye, Volume2 } from 'lucide-react';
 
-export function CardsTab() {
+type Props = {
+  onReview?: () => void;
+};
+
+// デモ用デッキ（Supabase の cards と接続するまでの仮データ）
+const DECK = [
+  {
+    word: 'launch',
+    meaning: '〜に着手する、開始する',
+    pos: '他動詞',
+    note: '他動詞のため launch into 〜 とせず、直接目的語をとる。',
+  },
+  {
+    word: 'obtain',
+    meaning: '〜を手に入れる、獲得する',
+    pos: '他動詞',
+    note: 'get より改まった語。obtain funds / obtain permission。',
+  },
+  {
+    word: 'feature',
+    meaning: '特徴；〜を呼び物にする',
+    pos: '名・他',
+    note: '名詞は「目立つ特徴」。動詞は「〜を特集する」。',
+  },
+  {
+    word: 'distinct',
+    meaning: 'はっきりした、別個の',
+    pos: '形容詞',
+    note: 'be distinct from 〜「〜とは別の」。distinctive は「特有の」。',
+  },
+  {
+    word: 'point',
+    meaning: '要点；〜を指す',
+    pos: '名・自他',
+    note: 'There is no point in -ing「〜しても無駄だ」。',
+  },
+];
+
+const SESSION_GOAL = 10;
+
+const RATINGS = [
+  { label: 'まだ', sub: '1分', btn: 'btn-berry' },
+  { label: '迷った', sub: '12時間', btn: 'btn-sun' },
+  { label: 'OK', sub: '3日', btn: 'btn-leaf' },
+  { label: '瞬殺', sub: '7日', btn: 'btn-sky' },
+];
+
+export function CardsTab({ onReview }: Props) {
   const [cardFlipped, setCardFlipped] = useState(false);
   const [cardMode, setCardMode] = useState<'receptive' | 'productive'>('receptive');
+  const [index, setIndex] = useState(0);
+  const [reviewed, setReviewed] = useState(0);
+
+  const card = DECK[index % DECK.length];
+  const front = cardMode === 'receptive' ? card.word : card.meaning;
+  const back = cardMode === 'receptive' ? card.meaning : card.word;
+
+  const handleRate = () => {
+    setReviewed((n) => n + 1);
+    setIndex((i) => i + 1);
+    setCardFlipped(false);
+    onReview?.();
+  };
 
   return (
     <div className="space-y-5 animate-soft-pop">
-      <div className="inline-flex w-full bg-slate-200/70 p-1 rounded-xl">
-        <button
-          onClick={() => {
-            setCardMode('receptive');
-            setCardFlipped(false);
-          }}
-          className={`flex-1 py-2 rounded-lg text-xs font-medium transition ${
-            cardMode === 'receptive'
-              ? 'bg-white text-slate-900 shadow-xs'
-              : 'text-slate-500 hover:text-slate-700'
-          }`}
-        >
-          受容カード（英 → 日）
-        </button>
-        <button
-          onClick={() => {
-            setCardMode('productive');
-            setCardFlipped(false);
-          }}
-          className={`flex-1 py-2 rounded-lg text-xs font-medium transition ${
-            cardMode === 'productive'
-              ? 'bg-white text-slate-900 shadow-xs'
-              : 'text-slate-500 hover:text-slate-700'
-          }`}
-        >
-          産出カード（日 → 英）
-        </button>
+      {/* セッション進捗 */}
+      <div className="flex items-center gap-3">
+        <div className="progress-track flex-1 h-4">
+          <div
+            className="progress-fill bg-leaf"
+            style={{ width: `${(Math.min(reviewed, SESSION_GOAL) / SESSION_GOAL) * 100}%` }}
+          />
+        </div>
+        <span className="text-sm font-black text-ink-soft tabular-nums">
+          {Math.min(reviewed, SESSION_GOAL)}/{SESSION_GOAL}
+        </span>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3">
+        {(
+          [
+            { id: 'receptive', label: '受容カード', sub: '英 → 日' },
+            { id: 'productive', label: '産出カード', sub: '日 → 英' },
+          ] as const
+        ).map((m) => {
+          const active = cardMode === m.id;
+          return (
+            <button
+              key={m.id}
+              onClick={() => {
+                setCardMode(m.id);
+                setCardFlipped(false);
+              }}
+              aria-pressed={active}
+              className={`btn-3d py-2.5 text-sm flex-col !gap-0 ${
+                active ? 'bg-sky-light text-sky-dark border-2 border-sky' : 'btn-white'
+              }`}
+              style={active ? { ['--chunk' as string]: 'var(--sky)' } : undefined}
+            >
+              <span>{m.label}</span>
+              <span className="text-[11px] font-bold opacity-75">{m.sub}</span>
+            </button>
+          );
+        })}
       </div>
 
       <div
-        onClick={() => setCardFlipped(!cardFlipped)}
-        className="bg-white min-h-[300px] rounded-2xl border border-slate-200/80 shadow-[0_2px_8px_rgba(0,0,0,0.03)] p-6 flex flex-col justify-between cursor-pointer hover:border-slate-300 transition"
+        onClick={() => setCardFlipped(true)}
+        className="card-3d min-h-[320px] p-5 flex flex-col justify-between cursor-pointer select-none"
       >
-        <div className="flex items-center justify-between text-xs text-slate-400">
+        <div className="flex items-center justify-between text-xs font-extrabold">
           <div className="flex items-center gap-2">
-            <span className="font-medium text-slate-600 bg-slate-100 px-2 py-0.5 rounded-md">
-              Sec.02
-            </span>
-            <span>他動詞</span>
+            <span className="rounded-lg bg-sky-light text-sky-dark px-2 py-0.5">Sec.02</span>
+            <span className="rounded-lg bg-cloud text-ink-soft px-2 py-0.5">{card.pos}</span>
           </div>
-          <span className="inline-flex items-center gap-1 tabular-nums">
-            <Clock className="w-3.5 h-3.5" />
+          <span className="inline-flex items-center gap-1 text-ink-faint tabular-nums">
+            <Clock className="w-4 h-4" />
             1.4s
           </span>
         </div>
 
-        <div className="text-center my-8 space-y-4">
-          <div className="text-3xl font-semibold tracking-tight text-slate-900">
-            {cardMode === 'receptive' ? 'launch' : '〜に着手する、開始する'}
+        <div key={`${index}-${cardMode}`} className="text-center my-6 space-y-5 animate-pop-in">
+          <div
+            className={`font-black tracking-tight text-ink ${
+              cardMode === 'receptive' ? 'text-4xl' : 'text-2xl leading-snug'
+            }`}
+          >
+            {front}
           </div>
 
           {cardFlipped ? (
-            <div className="pt-5 border-t border-slate-100 space-y-2 animate-soft-pop">
-              <div className="text-lg font-semibold text-indigo-600">
-                {cardMode === 'receptive' ? '〜に着手する、開始する' : 'launch'}
-              </div>
-              <p className="text-xs text-slate-500 max-w-sm mx-auto leading-relaxed">
-                語法注意：他動詞のため「launch into 〜」と前置詞を挟まず直接目的語をとる。
-              </p>
+            <div className="pt-5 border-t-2 border-dashed border-line space-y-2 animate-soft-pop">
+              <div className="text-xl font-black text-sky-dark">{back}</div>
+              <p className="text-xs font-bold text-ink-soft max-w-sm mx-auto leading-relaxed">{card.note}</p>
             </div>
           ) : (
-            <p className="text-xs text-slate-400">カードをタップして解答を表示</p>
+            <p className="text-xs font-extrabold text-ink-faint">頭の中で答えてから、タップして確認</p>
           )}
         </div>
 
-        <div className="flex justify-between items-center pt-2">
+        <div className="flex justify-between items-center">
           <button
             onClick={(e) => e.stopPropagation()}
-            className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-600 hover:text-indigo-600 px-3 py-1.5 rounded-lg border border-slate-200/80 hover:border-indigo-200 transition"
+            className="btn-3d btn-white px-3 py-2 text-xs"
           >
-            <Bookmark className="w-3.5 h-3.5" />
-            <span>今日の英作文に予約</span>
+            <Bookmark className="w-4 h-4 text-berry" />
+            今日の英作文に予約
           </button>
           <button
             onClick={(e) => e.stopPropagation()}
             aria-label="発音を再生"
-            className="p-2 rounded-lg border border-slate-200/80 text-slate-500 hover:text-slate-900 hover:bg-slate-50 transition"
+            className="btn-3d btn-sky w-12 h-12 !rounded-2xl"
           >
-            <Volume2 className="w-4 h-4" />
+            <Volume2 className="w-6 h-6" />
           </button>
         </div>
       </div>
 
-      <div className="grid grid-cols-4 gap-2">
-        {[
-          { label: 'まだ', sub: '1分', accent: 'hover:border-rose-300 hover:bg-rose-50/40 text-rose-700' },
-          { label: '迷った', sub: '12時間', accent: 'hover:border-amber-300 hover:bg-amber-50/40 text-amber-700' },
-          { label: 'OK', sub: '3日', accent: 'hover:border-emerald-300 hover:bg-emerald-50/40 text-emerald-700' },
-          { label: '瞬殺', sub: '7日', accent: 'hover:border-indigo-300 hover:bg-indigo-50/40 text-indigo-700' },
-        ].map((b) => (
-          <button
-            key={b.label}
-            onClick={() => setCardFlipped(false)}
-            className={`bg-white border border-slate-200/80 py-3 rounded-xl transition text-center shadow-2xs ${b.accent}`}
-          >
-            <div className="font-semibold text-xs">{b.label}</div>
-            <div className="text-[10px] text-slate-400 mt-0.5 tabular-nums">{b.sub}</div>
-          </button>
-        ))}
-      </div>
+      {cardFlipped ? (
+        <div className="grid grid-cols-4 gap-2 animate-soft-pop">
+          {RATINGS.map((b) => (
+            <button key={b.label} onClick={handleRate} className={`btn-3d ${b.btn} flex-col !gap-0 py-3`}>
+              <span className="text-sm">{b.label}</span>
+              <span className="text-[10px] font-bold opacity-85 tabular-nums">{b.sub}</span>
+            </button>
+          ))}
+        </div>
+      ) : (
+        <button onClick={() => setCardFlipped(true)} className="btn-3d btn-leaf w-full py-4 text-base">
+          <Eye className="w-5 h-5" />
+          答えを見る
+        </button>
+      )}
     </div>
   );
 }

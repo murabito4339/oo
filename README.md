@@ -7,8 +7,9 @@
 1. **ホーム（植物コンサバトリー & 学習ハブ）**
    - 学習完了・水やりに連動して360日サイクルで成長・季節変化（種 → 新芽 → 繁茂 → 蕾 → 180日目開花 → 紅葉・結実 → 落葉 → 再生）するSVG植物ビュー
    - 今日の復習ミッション・進行中セクションへの導線
-2. **学習パス**
-   - セクションごとの8ステップ構成（語彙セット → 受容インプット → 聴解 → 瞬間英作文 → 構成英作文 I/II → 4/3/2音読 → 総合自由英作文）
+2. **学習パス（Duolingo 型の縦スクロールパス）**
+   - セクションごとの10ステップ構成：出会う A → 思い出す A → 出会う B → 思い出す B → ストーリー → ミックス復習 → 瞬間英作文 → 構成英作文 → 4/3/2 流暢性 → 総合自由英作文（ボス）
+   - 50語を A/B に分けて間隔を作り、音声は最初の出会いから提示。各ノードは Nation の4ストランド（語に集中／聴く・読む／話す・書く／速く使う）で分類し、配分をパス上部に表示
 3. **カード学習**
    - 受容カード（英 → 日）／産出カード（日 → 英）の切り替え
    - FSRS（4段階評価）ベースの復習UI（※現在UIモック）
@@ -26,7 +27,8 @@
 - **Framework**: Next.js (App Router) / React / TypeScript
 - **Styling**: Tailwind CSS v4
 - **Icons**: `lucide-react`
-- **Fonts**: `Plus Jakarta Sans`, `Noto Sans JP`, `JetBrains Mono` (`next/font/google`)
+- **Fonts**: `Nunito`, `M PLUS Rounded 1c`, `Noto Sans JP`, `JetBrains Mono` (`next/font/google`)
+- **Design tokens**: `app/globals.css`（leaf / sky / sun / berry / grape と立体ボタン `.btn-3d`）、`lib/theme.ts`
 - **Backend / DB**: Supabase (`@supabase/supabase-js`)
 - **SRS Algorithm**: `ts-fsrs`
 
@@ -51,9 +53,10 @@ teppeki-app/
 │       ├── utils.ts                   # 成長計算・色補間・季節判定ロジック
 │       └── index.ts
 ├── components/
-│   ├── layout/                        # Header / BottomNav
-│   ├── modals/                        # ノード詳細モーダル
-│   └── tabs/                          # Home / Path / Cards / Writing / Vocab
+│   ├── layout/                        # Header / BottomNav・SideNav / StatsRail / DailyQuests
+│   ├── path/                          # パスのノード吹き出し・配分カード
+│   ├── tabs/                          # Home / Path / Cards / Writing / Vocab
+│   └── ui/                            # マスコット（Sprout）など
 ├── constants/
 │   └── curriculum.ts                  # カリキュラム・学習パス定義
 ├── lib/

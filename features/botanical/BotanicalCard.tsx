@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { Clock, Droplets, RotateCcw, Sprout, Trees } from 'lucide-react';
+import { ChevronDown, Clock, Droplets, RotateCcw, SlidersHorizontal, Sprout, Trees } from 'lucide-react';
 import { PLANT_DAY_PRESETS, SPECIES_PRESETS, TIME_PRESETS } from './constants';
 import { RealisticBotanicalCanvas } from './RealisticBotanicalCanvas';
 import type { SpeciesId } from './types';
@@ -103,8 +103,13 @@ export function BotanicalCard({
       : manualDateStr
     : manualDateStr;
 
+  const chip = (active: boolean, activeClass: string) =>
+    `text-[11px] font-extrabold px-3 py-1.5 rounded-xl border-2 transition tabular-nums ${
+      active ? activeClass : 'bg-white border-line text-ink-soft hover:bg-cloud'
+    }`;
+
   return (
-    <section className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/80 shadow-[0_1px_3px_rgba(0,0,0,0.03)] space-y-4">
+    <section className="card-3d p-3 sm:p-4 space-y-4">
       <RealisticBotanicalCanvas
         days={plantDays}
         isWateredToday={isWateredToday}
@@ -112,209 +117,189 @@ export function BotanicalCard({
         speciesId={speciesOverride === 'auto' ? null : speciesOverride}
       />
 
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1">
-        <div className="space-y-1">
-          <div className="flex items-center gap-2">
-            <Sprout className="w-4 h-4 text-emerald-600" />
-            <h1 className="text-sm font-semibold text-slate-900">Specimen: Lexis Botanica</h1>
+      <div className="flex items-center justify-between gap-3 px-1">
+        <div className="min-w-0 space-y-1">
+          <div className="flex items-center gap-2 flex-wrap">
+            <Sprout className="w-5 h-5 text-leaf" strokeWidth={2.6} />
+            <h2 className="text-base font-black text-ink">わたしの温室</h2>
             <span
-              className={`text-[10px] font-medium px-2 py-0.5 rounded-md ${
-                isWateredToday ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'
+              className={`text-[11px] font-extrabold px-2 py-0.5 rounded-full ${
+                isWateredToday ? 'bg-leaf-light text-leaf-dark' : 'bg-sun-light text-sun-dark'
               }`}
             >
               {isWateredToday ? '潤い十分' : '水やり待ち'}
             </span>
           </div>
-          <p className="text-xs text-slate-500 leading-relaxed">{growthMeta.desc}</p>
+          <p className="text-xs font-bold text-ink-soft leading-relaxed">{growthMeta.desc}</p>
         </div>
 
-        <button
-          onClick={onWaterPlant}
-          className="shrink-0 inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-medium transition shadow-xs"
-        >
-          <Droplets className="w-3.5 h-3.5 text-sky-300" />
-          <span>水やり（+1日）</span>
+        <button onClick={onWaterPlant} className="btn-3d btn-sky shrink-0 px-4 py-3 text-sm">
+          <Droplets className="w-5 h-5" />
+          <span>水やり</span>
         </button>
       </div>
 
-      <div className="pt-3 border-t border-slate-100 space-y-2.5">
-        <div className="flex items-center justify-between text-[11px]">
-          <span className="inline-flex items-center gap-1.5 font-medium text-slate-500">
-            <Trees className="w-3.5 h-3.5 text-slate-400" />
-            <span>植物の種類（開始季節）</span>
+      <details className="group rounded-2xl bg-cloud px-3 py-2">
+        <summary className="flex cursor-pointer list-none items-center justify-between py-1 text-xs font-extrabold text-ink-soft">
+          <span className="inline-flex items-center gap-1.5">
+            <SlidersHorizontal className="w-4 h-4" />
+            表示テスト（樹種・成長日・日時）
           </span>
-          <span className="text-[11px] font-medium text-slate-600">
-            {speciesOverride === 'auto' ? 'カレンダー季節と自動連動' : '手動固定中'}
-          </span>
-        </div>
+          <ChevronDown className="w-4 h-4 transition group-open:rotate-180" />
+        </summary>
 
-        <div className="flex flex-wrap gap-1.5">
-          <button
-            type="button"
-            onClick={() => setSpeciesOverride('auto')}
-            className={`text-[10px] font-medium px-2.5 py-1 rounded-lg border transition ${
-              speciesOverride === 'auto'
-                ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
-                : 'bg-slate-50/70 border-slate-200/70 text-slate-600 hover:bg-slate-100'
-            }`}
-          >
-            自動（季節連動）
-          </button>
-          {SPECIES_PRESETS.map((preset) => (
-            <button
-              key={preset.id}
-              type="button"
-              onClick={() => setSpeciesOverride(preset.id)}
-              className={`text-[10px] font-medium px-2.5 py-1 rounded-lg border transition ${
-                speciesOverride === preset.id
-                  ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
-                  : 'bg-slate-50/70 border-slate-200/70 text-slate-600 hover:bg-slate-100'
-              }`}
-            >
-              {preset.emoji} {preset.label}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <div className="pt-3 border-t border-slate-100 space-y-3">
-        <div className="flex items-center justify-between text-[11px]">
-          <span className="font-medium text-slate-500">
-            成長サイクル（180日開花 / 360日一巡・再生）
-          </span>
-          <span className="font-semibold text-slate-900 tabular-nums">累計 {plantDays}日</span>
-        </div>
-
-        <input
-          type="range"
-          min={0}
-          max={420}
-          value={plantDays}
-          onChange={(e) => onChangePlantDays(Number(e.target.value))}
-          className="w-full h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-indigo-600"
-        />
-
-        <div className="flex flex-wrap gap-1.5">
-          {PLANT_DAY_PRESETS.map((preset) => (
-            <button
-              key={preset.day}
-              onClick={() => onChangePlantDays(preset.day)}
-              className={`text-[10px] font-medium px-2.5 py-1 rounded-lg border transition tabular-nums ${
-                plantDays === preset.day
-                  ? 'bg-indigo-50 border-indigo-200 text-indigo-700'
-                  : 'bg-slate-50/70 border-slate-200/70 text-slate-600 hover:bg-slate-100'
-              }`}
-            >
-              {preset.label}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <div className="pt-3 border-t border-slate-100 space-y-3">
-        <div className="flex flex-wrap items-center justify-between gap-2 text-[11px]">
-          <span className="inline-flex items-center gap-1.5 font-medium text-slate-500">
-            <Clock className="w-3.5 h-3.5 text-slate-400" />
-            <span>日時実験（四季背景・太陽・月・夜の光）</span>
-          </span>
-          <div className="flex items-center gap-2">
-            <input
-              type="date"
-              value={activeDateStr}
-              onChange={(e) => {
-                if (!e.target.value) return;
-                setIsRealtime(false);
-                setManualDateStr(e.target.value);
-              }}
-              className="text-[11px] font-medium text-slate-700 bg-slate-50 border border-slate-200/80 rounded-lg px-2 py-0.5 tabular-nums"
-            />
-            <span className="font-semibold text-slate-900 tabular-nums min-w-[40px] text-right">
-              {formatTimeLabel(activeMinutes)}
-            </span>
-            <button
-              type="button"
-              onClick={() => {
-                const current = new Date();
-                setLiveNow(current);
-                setManualDateStr(formatDateInput(current));
-                setManualMinutes(current.getHours() * 60 + current.getMinutes());
-                setIsRealtime(true);
-              }}
-              className={`inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-md border transition ${
-                isRealtime
-                  ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
-                  : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
-              }`}
-            >
-              <RotateCcw className="w-2.5 h-2.5" />
-              <span>{isRealtime ? 'リアルタイム中' : '現在時刻に戻す'}</span>
-            </button>
-          </div>
-        </div>
-
-        <div className="flex flex-wrap gap-1.5">
-          {DATE_SEASON_PRESETS.map((preset) => {
-            const year = Number(activeDateStr.slice(0, 4)) || 2026;
-            const targetStr = `${year}-${String(preset.month).padStart(2, '0')}-${String(preset.day).padStart(2, '0')}`;
-            return (
+        <div className="space-y-4 pt-3 pb-1">
+          <div className="space-y-2">
+            <div className="flex items-center justify-between text-[11px] font-extrabold">
+              <span className="inline-flex items-center gap-1.5 text-ink-soft">
+                <Trees className="w-3.5 h-3.5" />
+                植物の種類（開始季節）
+              </span>
+              <span className="text-ink-faint">
+                {speciesOverride === 'auto' ? 'カレンダー季節と自動連動' : '手動固定中'}
+              </span>
+            </div>
+            <div className="flex flex-wrap gap-1.5">
               <button
-                key={preset.label}
                 type="button"
-                onClick={() => {
-                  setIsRealtime(false);
-                  setManualDateStr(targetStr);
-                }}
-                className={`text-[10px] font-medium px-2.5 py-1 rounded-lg border transition tabular-nums ${
-                  !isRealtime && activeDateStr === targetStr
-                    ? 'bg-sky-50 border-sky-200 text-sky-700'
-                    : 'bg-slate-50/70 border-slate-200/70 text-slate-600 hover:bg-slate-100'
-                }`}
+                onClick={() => setSpeciesOverride('auto')}
+                className={chip(speciesOverride === 'auto', 'bg-leaf-light border-leaf text-leaf-dark')}
               >
-                {preset.label}
+                自動（季節連動）
               </button>
-            );
-          })}
-        </div>
+              {SPECIES_PRESETS.map((preset) => (
+                <button
+                  key={preset.id}
+                  type="button"
+                  onClick={() => setSpeciesOverride(preset.id)}
+                  className={chip(speciesOverride === preset.id, 'bg-leaf-light border-leaf text-leaf-dark')}
+                >
+                  {preset.emoji} {preset.label}
+                </button>
+              ))}
+            </div>
+          </div>
 
-        <input
-          type="range"
-          min={0}
-          max={1439}
-          step={5}
-          value={activeMinutes}
-          onChange={(e) => {
-            if (isRealtime && liveNow) {
-              setManualDateStr(formatDateInput(liveNow));
-            }
-            setIsRealtime(false);
-            setManualMinutes(Number(e.target.value));
-          }}
-          className="w-full h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-amber-500"
-        />
+          <div className="space-y-2">
+            <div className="flex items-center justify-between text-[11px] font-extrabold">
+              <span className="text-ink-soft">成長サイクル（180日開花 / 360日一巡・再生）</span>
+              <span className="text-ink tabular-nums">累計 {plantDays}日</span>
+            </div>
+            <input
+              type="range"
+              min={0}
+              max={420}
+              value={plantDays}
+              onChange={(e) => onChangePlantDays(Number(e.target.value))}
+              className="w-full h-2 bg-line rounded-full appearance-none cursor-pointer accent-leaf"
+            />
+            <div className="flex flex-wrap gap-1.5">
+              {PLANT_DAY_PRESETS.map((preset) => (
+                <button
+                  key={preset.day}
+                  onClick={() => onChangePlantDays(preset.day)}
+                  className={chip(plantDays === preset.day, 'bg-sky-light border-sky text-sky-dark')}
+                >
+                  {preset.label}
+                </button>
+              ))}
+            </div>
+          </div>
 
-        <div className="flex flex-wrap gap-1.5">
-          {TIME_PRESETS.map((preset) => (
-            <button
-              key={preset.minutes}
-              type="button"
-              onClick={() => {
+          <div className="space-y-2">
+            <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] font-extrabold">
+              <span className="inline-flex items-center gap-1.5 text-ink-soft">
+                <Clock className="w-3.5 h-3.5" />
+                日時（四季背景・太陽・月・夜の光）
+              </span>
+              <div className="flex items-center gap-2">
+                <input
+                  type="date"
+                  value={activeDateStr}
+                  onChange={(e) => {
+                    if (!e.target.value) return;
+                    setIsRealtime(false);
+                    setManualDateStr(e.target.value);
+                  }}
+                  className="text-[11px] font-extrabold text-ink bg-white border-2 border-line rounded-lg px-2 py-0.5 tabular-nums"
+                />
+                <span className="text-ink tabular-nums min-w-[40px] text-right">
+                  {formatTimeLabel(activeMinutes)}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const current = new Date();
+                    setLiveNow(current);
+                    setManualDateStr(formatDateInput(current));
+                    setManualMinutes(current.getHours() * 60 + current.getMinutes());
+                    setIsRealtime(true);
+                  }}
+                  className={chip(isRealtime, 'bg-leaf-light border-leaf text-leaf-dark') + ' inline-flex items-center gap-1 !py-0.5'}
+                >
+                  <RotateCcw className="w-3 h-3" />
+                  <span>{isRealtime ? 'リアルタイム中' : '現在時刻に戻す'}</span>
+                </button>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap gap-1.5">
+              {DATE_SEASON_PRESETS.map((preset) => {
+                const year = Number(activeDateStr.slice(0, 4)) || 2026;
+                const targetStr = `${year}-${String(preset.month).padStart(2, '0')}-${String(preset.day).padStart(2, '0')}`;
+                return (
+                  <button
+                    key={preset.label}
+                    type="button"
+                    onClick={() => {
+                      setIsRealtime(false);
+                      setManualDateStr(targetStr);
+                    }}
+                    className={chip(!isRealtime && activeDateStr === targetStr, 'bg-sky-light border-sky text-sky-dark')}
+                  >
+                    {preset.label}
+                  </button>
+                );
+              })}
+            </div>
+
+            <input
+              type="range"
+              min={0}
+              max={1439}
+              step={5}
+              value={activeMinutes}
+              onChange={(e) => {
                 if (isRealtime && liveNow) {
                   setManualDateStr(formatDateInput(liveNow));
                 }
                 setIsRealtime(false);
-                setManualMinutes(preset.minutes);
+                setManualMinutes(Number(e.target.value));
               }}
-              className={`text-[10px] font-medium px-2.5 py-1 rounded-lg border transition tabular-nums ${
-                !isRealtime && activeMinutes === preset.minutes
-                  ? 'bg-amber-50 border-amber-200 text-amber-800'
-                  : 'bg-slate-50/70 border-slate-200/70 text-slate-600 hover:bg-slate-100'
-              }`}
-            >
-              {preset.label}
-            </button>
-          ))}
+              className="w-full h-2 bg-line rounded-full appearance-none cursor-pointer accent-sun"
+            />
+
+            <div className="flex flex-wrap gap-1.5">
+              {TIME_PRESETS.map((preset) => (
+                <button
+                  key={preset.minutes}
+                  type="button"
+                  onClick={() => {
+                    if (isRealtime && liveNow) {
+                      setManualDateStr(formatDateInput(liveNow));
+                    }
+                    setIsRealtime(false);
+                    setManualMinutes(preset.minutes);
+                  }}
+                  className={chip(!isRealtime && activeMinutes === preset.minutes, 'bg-sun-light border-sun text-sun-dark')}
+                >
+                  {preset.label}
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
-      </div>
+      </details>
     </section>
   );
 }
