@@ -109,7 +109,7 @@ export const LEAF_CMDS: Record<LeafShape, Cmd[]> = {
 
 // ---------- 花（半径 1） ----------
 
-const sakuraPetal: Cmd[] = [
+export const SAKURA_PETAL: Cmd[] = [
   ['M', 0, 0.5],
   ['C', -0.55, 0.2, -0.5, -0.45, -0.12, -0.5],
   ['L', 0, -0.36],
@@ -118,38 +118,37 @@ const sakuraPetal: Cmd[] = [
   ['Z'],
 ];
 
-const hibiscusPetal: Cmd[] = [
+const HIBISCUS_PETAL: Cmd[] = [
   ['M', 0, 0],
   ['C', -0.62, -0.25, -0.6, -1.0, 0, -1.0],
   ['C', 0.6, -1.0, 0.62, -0.25, 0, 0],
   ['Z'],
 ];
 
-export type FlowerParts = { petalA: string; petalB: string; center: string; accent: string; stamen: string };
+/** 花びらは 1 枚ずつ配列で返す（散るときに枚数を減らせるように） */
+export type FlowerParts = { petalA: string[]; petalB: string[]; center: string; accent: string; stamen: string };
 
 export function flowerD(style: 'sakura' | 'camellia' | 'hibiscus' | 'mapleBlossom', t: Xf): FlowerParts {
-  const parts: FlowerParts = { petalA: '', petalB: '', center: '', accent: '', stamen: '' };
+  const parts: FlowerParts = { petalA: [], petalB: [], center: '', accent: '', stamen: '' };
   const compose = (cmds: Cmd[], local: Xf) => emit(xfCmds(cmds, local), t);
   if (style === 'sakura') {
     for (let i = 0; i < 5; i++) {
       const a = ((i * 72 - 90) * Math.PI) / 180;
-      parts.petalA += compose(sakuraPetal, { x: Math.cos(a) * 0.55, y: Math.sin(a) * 0.55, rot: (i * 72 * Math.PI) / 180, sx: 1 });
+      parts.petalA.push(compose(SAKURA_PETAL, { x: Math.cos(a) * 0.55, y: Math.sin(a) * 0.55, rot: (i * 72 * Math.PI) / 180, sx: 1 }));
     }
     parts.center += emit(ellipseCmds(0.22, 0.22), t);
   } else if (style === 'camellia') {
     for (let i = 0; i < 6; i++) {
       const petal = xfCmds(ellipseCmds(0.42, 0.5), { x: 0, y: -0.42, rot: 0, sx: 1 });
       const d = compose(petal, { x: 0, y: 0, rot: ((i * 60 + 15) * Math.PI) / 180, sx: 1 });
-      if (i % 2) parts.petalB += d;
-      else parts.petalA += d;
+      (i % 2 ? parts.petalB : parts.petalA).push(d);
     }
     parts.accent += emit(ellipseCmds(0.36, 0.36), t);
     parts.center += emit(ellipseCmds(0.22, 0.22), t);
   } else if (style === 'hibiscus') {
     for (let i = 0; i < 5; i++) {
-      const d = compose(hibiscusPetal, { x: 0, y: 0, rot: (i * 72 * Math.PI) / 180, sx: 1 });
-      if (i % 2) parts.petalB += d;
-      else parts.petalA += d;
+      const d = compose(HIBISCUS_PETAL, { x: 0, y: 0, rot: (i * 72 * Math.PI) / 180, sx: 1 });
+      (i % 2 ? parts.petalB : parts.petalA).push(d);
     }
     parts.center += emit(ellipseCmds(0.28, 0.28), t);
     parts.stamen += emit(
@@ -167,7 +166,7 @@ export function flowerD(style: 'sakura' | 'camellia' | 'hibiscus' | 'mapleBlosso
       [0.9, 0.5],
       [-0.7, 0.7],
     ]) {
-      parts.petalA += emit(ellipseCmds(0.45, 0.45, dx, dy), t);
+      parts.petalA.push(emit(ellipseCmds(0.45, 0.45, dx, dy), t));
       parts.center += emit(ellipseCmds(0.18, 0.18, dx, dy), t);
     }
   }

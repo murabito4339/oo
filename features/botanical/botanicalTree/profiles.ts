@@ -54,7 +54,6 @@ export const PROFILES: Record<SpeciesId, BotanicalProfile> = {
       mid: ['#7DBB55', '#2F7A43', '#D4A53A', '#C9512E', '#8A644A'],
       light: ['#B9E08A', '#5FA65A', '#F0D27A', '#EE8A4A', '#B08A68'],
     },
-    young: ['#6B4A2E', '#9A6B3E', '#C49A62'],
     bark: { dark: '#3B2A23', mid: '#5C4236', light: '#8A6A57' },
     lenticels: true,
     flowerStyle: 'sakura',
@@ -106,9 +105,10 @@ export const PROFILES: Record<SpeciesId, BotanicalProfile> = {
     leafLen: 9.5,
     leafLevels: 3,
     leaf: {
-      dark: ['#2C6A45', '#123826', '#123826', '#123826', '#123826'],
-      mid: ['#4C9A63', '#1F5A3C', '#1F5A3C', '#1F5A3C', '#1F5A3C'],
-      light: ['#8CCB98', '#4E8F68', '#4E8F68', '#4E8F68', '#4E8F68'],
+      // 2〜4 は世代交代で古い木の葉が枯れるときだけ使う
+      dark: ['#2C6A45', '#123826', '#4A5A22', '#6B4A22', '#5A4030'],
+      mid: ['#4C9A63', '#1F5A3C', '#7A8A33', '#9A6A2E', '#7E5A40'],
+      light: ['#8CCB98', '#4E8F68', '#A8B04A', '#C08A44', '#A07A5A'],
     },
     bark: { dark: '#4E4640', mid: '#776B62', light: '#A3978C' },
     lenticels: false,
@@ -132,9 +132,10 @@ export const PROFILES: Record<SpeciesId, BotanicalProfile> = {
     leafLen: 10,
     leafLevels: 3,
     leaf: {
-      dark: ['#2E7D3E', '#17532F', '#17532F', '#17532F', '#17532F'],
-      mid: ['#4CA457', '#237A42', '#237A42', '#237A42', '#237A42'],
-      light: ['#8ED184', '#57AE62', '#57AE62', '#57AE62', '#57AE62'],
+      // 2〜4 は世代交代で古い木の葉が枯れるときだけ使う
+      dark: ['#2E7D3E', '#17532F', '#5A6A22', '#7A5A22', '#5A4030'],
+      mid: ['#4CA457', '#237A42', '#8A9A33', '#B07A2E', '#7E5A40'],
+      light: ['#8ED184', '#57AE62', '#BAC24A', '#D49A44', '#A07A5A'],
     },
     bark: { dark: '#4B3A2C', mid: '#6B5340', light: '#8F7559' },
     lenticels: false,
@@ -162,15 +163,19 @@ export type TreeState = {
   fall: number;
   /** 若葉の色の強さ 0〜1 */
   young: number;
+  /** 幹がまだ緑色の若い茎である度合い 0〜1 */
+  greenStem: number;
 };
 
 export function getTreeState(profile: BotanicalProfile, cd: number): TreeState {
-  // 序盤は速く、成木に近づくほどゆっくり育つ
-  const g = Math.pow(clamp((cd - 22) / 128, 0, 1), 0.75);
+  // 発芽の日から内部的に育て、芽の段階が終わる cd24 には芽と同じくらいの若木になっている。
+  // 序盤は速く、成木（cd150）に近づくほどゆっくり育つ。
+  const g = Math.pow(clamp((cd - 1) / 149, 0, 1), 0.75);
   const greenUp = clamp((cd - 24) / 66, 0, 1);
   const young = profile.young ? clamp(1 - (cd - 24) / 40, 0, 1) : 0;
+  const greenStem = clamp(1 - (cd - 24) / 30, 0, 1);
   if (!profile.deciduous || !profile.autumn) {
-    return { g, cT: greenUp, cSpread: 0.25, fall: 0, young };
+    return { g, cT: greenUp, cSpread: 0.25, fall: 0, young, greenStem };
   }
   const { colorStart, fallStart, fallEnd } = profile.autumn;
   let cT = greenUp;
@@ -180,8 +185,9 @@ export function getTreeState(profile: BotanicalProfile, cd: number): TreeState {
     cT = t < 25 ? lerp(1, 2, t / 25) : t < 55 ? lerp(2, 3, (t - 25) / 30) : lerp(3, 4, (t - 55) / 45);
     cSpread = 1.4;
   }
-  const fall = clamp((cd - fallStart) / (fallEnd - fallStart), 0, 1);
-  return { g, cT, cSpread, fall, young };
+  // 見た目の葉の減り方が一定になるよう、序盤を少し早める
+  const fall = Math.pow(clamp((cd - fallStart) / (fallEnd - fallStart), 0, 1), 0.7);
+  return { g, cT, cSpread, fall, young, greenStem };
 }
 
 export type BloomPhase = {
@@ -189,29 +195,26 @@ export type BloomPhase = {
   bud: number;
   /** 開き具合（0 で非表示） */
   open: number;
-  /** しおれ具合 */
+  /** 花の終わりの進み具合 0〜1（桜は花びらが散り、椿・ハイビスカスは 1 で花ごと落ちる） */
   wither: number;
-  /** 実の熟し具合（-1 で非表示） */
-  fruit: number;
+  /** 咲き始めの日（ノードごとにずれる） */
+  start: number;
 };
 
 /**
- * 花ノード 1 つの状態。ノードごとに開花日を最大 ±3 日ずらし、
+ * 花ノード 1 つの状態。ノードごとに開花日を -2〜+3 日ずらし、
  * 自分の開花日までは必ずつぼみを出しておく（つぼみも花もない日を作らない）。
  */
-export function getBloomPhase(schedule: SpeciesBloomSchedule, cd: number, dayOffset: number, hasFruit: boolean): BloomPhase {
-  const { budStart, flowerStart, flowerWitherStart, flowerEnd, fruitStart, fruitEnd } = schedule;
+export function getBloomPhase(schedule: SpeciesBloomSchedule, cd: number, dayOffset: number): BloomPhase {
+  const { budStart, flowerStart, flowerWitherStart, flowerEnd } = schedule;
   const start = flowerStart + dayOffset;
-  const phase: BloomPhase = { bud: 0, open: 0, wither: 0, fruit: -1 };
+  const phase: BloomPhase = { bud: 0, open: 0, wither: 0, start };
   if (cd >= budStart && cd < start) {
     phase.bud = clamp((cd - budStart) / Math.max(1, start - budStart), 0.15, 1);
   }
-  if (cd >= start && cd <= flowerEnd + dayOffset) {
+  if (cd >= start) {
     phase.open = clamp((cd - start + 1) / 5, 0.35, 1);
     phase.wither = clamp((cd - (flowerWitherStart + dayOffset)) / Math.max(1, flowerEnd - flowerWitherStart), 0, 1);
-  }
-  if (hasFruit && cd >= fruitStart && cd <= fruitEnd) {
-    phase.fruit = clamp((cd - fruitStart) / 45, 0, 1);
   }
   return phase;
 }
