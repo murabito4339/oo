@@ -11,24 +11,20 @@ import { PathTab } from '@/components/tabs/PathTab';
 import { VocabTab } from '@/components/tabs/VocabTab';
 import { WritingTab } from '@/components/tabs/WritingTab';
 import { SECTIONS } from '@/constants/curriculum';
+import { progressActions, useProgress } from '@/lib/progressStore';
 import type { NodeItem, TabType } from '@/types/lexis';
 
 type Toast = { title: string; sub?: string };
 
 export default function Home() {
   const [activeTab, setActiveTab] = useState<TabType>('home');
-  const [plantDays, setPlantDays] = useState(180);
+  const { completed, plant } = useProgress();
+  const plantDays = plant.days;
   const [streak, setStreak] = useState(5);
   const [isWateredToday, setIsWateredToday] = useState(false);
   const masteredCount = 142;
 
   const [selectedSectionId, setSelectedSectionId] = useState('sec2');
-  const [sectionProgress, setSectionProgress] = useState<Record<string, number>>({
-    sec1: 10,
-    sec2: 3,
-    sec3: 1,
-    sec4: 0,
-  });
 
   // デイリークエスト（デモ：その日の操作回数）
   const [stepsToday, setStepsToday] = useState(0);
@@ -38,7 +34,7 @@ export default function Home() {
   const [toast, setToast] = useState<Toast | null>(null);
 
   const currentSection = SECTIONS.find((s) => s.id === selectedSectionId) || SECTIONS[0];
-  const doneCount = sectionProgress[selectedSectionId] ?? 0;
+  const currentCompleted = completed[selectedSectionId] ?? [];
   const quests = { stepsToday, reviewedToday, writingChecks };
 
   const triggerToast = (next: Toast) => {
@@ -47,7 +43,7 @@ export default function Home() {
   };
 
   const water = () => {
-    setPlantDays((d) => d + 1);
+    progressActions.addPlantDays(1);
     if (!isWateredToday) {
       setStreak((s) => s + 1);
       setIsWateredToday(true);
@@ -60,10 +56,7 @@ export default function Home() {
   };
 
   const handleCompleteNode = (sectionId: string, node: NodeItem) => {
-    const currentDone = sectionProgress[sectionId] ?? 0;
-    if (node.step > currentDone) {
-      setSectionProgress((prev) => ({ ...prev, [sectionId]: node.step }));
-    }
+    progressActions.completeStep(sectionId, node.step);
     setSelectedSectionId(sectionId);
     setStepsToday((n) => n + 1);
     water();
@@ -104,10 +97,11 @@ export default function Home() {
             plantDays={plantDays}
             isWateredToday={isWateredToday}
             currentSection={currentSection}
-            doneCount={doneCount}
+            completed={currentCompleted}
+            plantStartDate={plant.startDate}
             quests={quests}
             onWaterPlant={handleWaterPlant}
-            onChangePlantDays={setPlantDays}
+            onChangePlantDays={progressActions.setPlantDays}
             onNavigateTab={setActiveTab}
           />
         )}
@@ -115,7 +109,7 @@ export default function Home() {
         {activeTab === 'path' && (
           <PathTab
             selectedSectionId={selectedSectionId}
-            sectionProgress={sectionProgress}
+            completed={completed}
             onSelectSection={setSelectedSectionId}
             onCompleteNode={handleCompleteNode}
             onOpenVocab={() => setActiveTab('vocab')}
@@ -124,7 +118,9 @@ export default function Home() {
 
         {activeTab === 'cards' && <CardsTab onReview={() => setReviewedToday((n) => n + 1)} />}
         {activeTab === 'writing' && <WritingTab onCheck={() => setWritingChecks((n) => n + 1)} />}
-        {activeTab === 'vocab' && <VocabTab />}
+        {activeTab === 'vocab' && (
+          <VocabTab initialSectionId={selectedSectionId} />
+        )}
       </main>
 
       <StatsRail

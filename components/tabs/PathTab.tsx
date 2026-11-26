@@ -15,13 +15,15 @@ import {
   STRAND_META,
   TOP_OFFSET,
   TOTAL_STEPS,
+  nodeStatus,
 } from "@/constants/curriculum";
 import { NODE_ICONS, STRAND_THEME, THEME } from "@/lib/theme";
 import type { NodeItem, SectionData } from "@/types/lexis";
 
 type Props = {
   selectedSectionId: string;
-  sectionProgress: Record<string, number>;
+  /** セクションごとの完了ステップ */
+  completed: Record<string, number[]>;
   onSelectSection: (id: string) => void;
   onCompleteNode: (sectionId: string, node: NodeItem) => void;
   onOpenVocab: () => void;
@@ -31,7 +33,7 @@ type OpenNode = { sectionId: string; step: number } | null;
 
 export function PathTab({
   selectedSectionId,
-  sectionProgress,
+  completed,
   onSelectSection,
   onCompleteNode,
   onOpenVocab,
@@ -64,7 +66,7 @@ export function PathTab({
           key={section.id}
           section={section}
           sectionIdx={sectionIdx}
-          doneCount={sectionProgress[section.id] ?? 0}
+          completed={completed[section.id] ?? []}
           isSelected={section.id === selectedSectionId}
           openStep={openNode?.sectionId === section.id ? openNode.step : null}
           currentNodeRef={
@@ -93,10 +95,41 @@ export function PathTab({
   );
 }
 
+/** ノード下側の立体の厚み（globals.css の .node-3d の box-shadow と同じ値） */
+const NODE_DEPTH = 7;
+/** リングの外側の線からノードまでの距離（線の太さ 5px ＋ すき間 5px） */
+const RING_OFFSET = 10;
+const BOSS_RADIUS = 26;
+
+/**
+ * 「次のステップ」を囲むリング。
+ * ノードは下に 7px の厚みがあるので、ボタンの四角ではなく「ボタン＋厚み」の中心に合わせる。
+ * 丸いノードは正円のまま、上下のすき間がそろう大きさにする。
+ */
+function currentRingStyle(size: number, isBoss: boolean): React.CSSProperties {
+  if (isBoss) {
+    return {
+      left: -RING_OFFSET,
+      top: -RING_OFFSET,
+      width: size + RING_OFFSET * 2,
+      height: size + NODE_DEPTH + RING_OFFSET * 2,
+      borderRadius: BOSS_RADIUS + RING_OFFSET,
+    };
+  }
+  const diameter = size + NODE_DEPTH + RING_OFFSET * 2;
+  return {
+    left: -(RING_OFFSET + NODE_DEPTH / 2),
+    top: -RING_OFFSET,
+    width: diameter,
+    height: diameter,
+    borderRadius: "9999px",
+  };
+}
+
 function UnitPath({
   section,
   sectionIdx,
-  doneCount,
+  completed,
   isSelected,
   openStep,
   currentNodeRef,
@@ -107,7 +140,7 @@ function UnitPath({
 }: {
   section: SectionData;
   sectionIdx: number;
-  doneCount: number;
+  completed: number[];
   isSelected: boolean;
   openStep: number | null;
   currentNodeRef?: React.RefObject<HTMLButtonElement | null>;
@@ -117,6 +150,7 @@ function UnitPath({
   nextSection?: SectionData;
 }) {
   const theme = THEME[section.color];
+  const doneCount = completed.length;
   const isComplete = doneCount >= TOTAL_STEPS;
   const coords = NODE_TEMPLATE.map((_, idx) => ({
     x: PATH_CENTER_X + SNAKE_OFFSETS[idx],
@@ -189,12 +223,7 @@ function UnitPath({
           </div>
 
           {NODE_TEMPLATE.map((node, idx) => {
-            const status: "done" | "current" | "locked" =
-              node.step <= doneCount
-                ? "done"
-                : node.step === doneCount + 1
-                  ? "current"
-                  : "locked";
+            const status = nodeStatus(node.step, completed);
             const { x, y } = coords[idx];
             const isBoss = node.kind === "boss";
             const size = isBoss ? 84 : 70;
@@ -228,9 +257,9 @@ function UnitPath({
                   >
                     {status === "current" && (
                       <span
-                        className={`absolute -inset-[9px] rounded-full border-[6px] ${theme.border} opacity-40 animate-ring-pulse ${
-                          isBoss ? "rounded-[30px]" : ""
-                        }`}
+                        aria-hidden
+                        className={`absolute border-[5px] ${theme.border} opacity-40 animate-ring-pulse`}
+                        style={currentRingStyle(size, isBoss)}
                       />
                     )}
                     <button

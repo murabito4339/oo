@@ -1,6 +1,6 @@
 import { ChevronRight, Layers, PenLine, Play } from 'lucide-react';
 import { DailyQuests, type QuestProgress } from '@/components/layout/DailyQuests';
-import { NODE_TEMPLATE, STRAND_META, TOTAL_STEPS } from '@/constants/curriculum';
+import { STRAND_META, TOTAL_STEPS, nextNodeOf } from '@/constants/curriculum';
 import { BotanicalCard } from '@/features/botanical';
 import { NODE_ICONS, THEME } from '@/lib/theme';
 import type { SectionData, TabType } from '@/types/lexis';
@@ -9,7 +9,10 @@ type Props = {
   plantDays: number;
   isWateredToday: boolean;
   currentSection: SectionData;
-  doneCount: number;
+  /** 選択中セクションの完了ステップ */
+  completed: number[];
+  /** 植物を育て始めた日（YYYY-MM-DD） */
+  plantStartDate: string | null;
   quests: QuestProgress;
   onWaterPlant: () => void;
   onChangePlantDays: (days: number) => void;
@@ -20,14 +23,16 @@ export function HomeTab({
   plantDays,
   isWateredToday,
   currentSection,
-  doneCount,
+  completed,
+  plantStartDate,
   quests,
   onWaterPlant,
   onChangePlantDays,
   onNavigateTab,
 }: Props) {
   const theme = THEME[currentSection.color];
-  const nextNode = NODE_TEMPLATE.find((n) => n.step === doneCount + 1);
+  const nextNode = nextNodeOf(completed);
+  const doneCount = completed.length;
   const NextIcon = nextNode ? NODE_ICONS[nextNode.icon] : null;
 
   return (
@@ -83,6 +88,7 @@ export function HomeTab({
       <BotanicalCard
         plantDays={plantDays}
         isWateredToday={isWateredToday}
+        startDate={plantStartDate}
         onWaterPlant={onWaterPlant}
         onChangePlantDays={onChangePlantDays}
       />

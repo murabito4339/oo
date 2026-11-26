@@ -12,9 +12,20 @@ type Props = {
   isWateredToday: boolean;
   onWaterPlant: () => void;
   onChangePlantDays: (days: number) => void;
+  /** 育て始めた季節（明示する場合）。指定がなければ startDate の季節 */
   startedSeason?: SpeciesId;
-  startDate?: Date | string;
+  /** 育て始めた日（Date または YYYY-MM-DD）。樹種はこの日の季節で決まり、今日の日付では変わらない */
+  startDate?: Date | string | null;
 };
+
+function parseStartDate(value: Date | string | null | undefined): Date | null {
+  if (!value) return null;
+  if (value instanceof Date) return Number.isNaN(value.getTime()) ? null : value;
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  // YYYY-MM-DD はローカル日付として読む（new Date('2026-11-30') は UTC 扱いで日付がずれうる）
+  const parsed = m ? new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])) : new Date(value);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
 
 const DATE_SEASON_PRESETS = [
   { label: '春 (04/15)', month: 4, day: 15 },
@@ -44,26 +55,16 @@ export function BotanicalCard({
   startedSeason,
   startDate,
 }: Props) {
-  const initialFromStartDate = useMemo<SpeciesId | 'auto'>(() => {
-    if (startedSeason) return startedSeason;
-    if (startDate) {
-      const parsed = startDate instanceof Date ? startDate : new Date(startDate);
-      if (!Number.isNaN(parsed.getTime())) {
-        return getSeasonFromDate(parsed);
-      }
-    }
-    return 'auto';
-  }, [startedSeason, startDate]);
+  const parsedStartDate = useMemo(() => parseStartDate(startDate), [startDate]);
+  // 「自動」のときの樹種。開始日の季節で固定する（カレンダーの月が変わっても切り替わらない）
+  const startSeason: SpeciesId | null =
+    startedSeason ?? (parsedStartDate ? getSeasonFromDate(parsedStartDate) : null);
 
   const [liveNow, setLiveNow] = useState<Date | null>(null);
   const [isRealtime, setIsRealtime] = useState(true);
   const [manualDateStr, setManualDateStr] = useState('2026-11-26');
   const [manualMinutes, setManualMinutes] = useState(720);
-  const [speciesOverride, setSpeciesOverride] = useState<SpeciesId | 'auto'>(initialFromStartDate);
-
-  useEffect(() => {
-    setSpeciesOverride(initialFromStartDate);
-  }, [initialFromStartDate]);
+  const [speciesOverride, setSpeciesOverride] = useState<SpeciesId | 'auto'>('auto');
 
   useEffect(() => {
     const initial = new Date();
@@ -86,9 +87,12 @@ export function BotanicalCard({
     return new Date(y, m - 1, d, hh, mm, 0);
   }, [isRealtime, manualDateStr, manualMinutes]);
 
-  const activeDate = simulatedDate ?? liveNow;
+  // 開始日がまだ読めていない（サーバー描画の）間だけ、既定の樹種で描く
   const resolvedSpeciesId: SpeciesId =
-    speciesOverride === 'auto' ? getSeasonFromDate(activeDate) : speciesOverride;
+    speciesOverride === 'auto' ? (startSeason ?? getSeasonFromDate(null)) : speciesOverride;
+  const startLabel = parsedStartDate
+    ? `${parsedStartDate.getMonth() + 1}/${parsedStartDate.getDate()}に開始`
+    : null;
   const growthMeta = getGrowthStageMeta(plantDays, resolvedSpeciesId);
 
   const activeMinutes = isRealtime
@@ -114,7 +118,7 @@ export function BotanicalCard({
         days={plantDays}
         isWateredToday={isWateredToday}
         simulatedDate={simulatedDate}
-        speciesId={speciesOverride === 'auto' ? null : speciesOverride}
+        speciesId={resolvedSpeciesId}
       />
 
       <div className="flex items-center justify-between gap-3 px-1">
@@ -156,7 +160,11 @@ export function BotanicalCard({
                 植物の種類（開始季節）
               </span>
               <span className="text-ink-faint">
-                {speciesOverride === 'auto' ? 'カレンダー季節と自動連動' : '手動固定中'}
+                {speciesOverride === 'auto'
+                  ? startLabel
+                    ? `${startLabel}・${SPECIES_PRESETS.find((p) => p.id === resolvedSpeciesId)?.label ?? ''}`
+                    : '開始日の季節'
+                  : '手動で指定中'}
               </span>
             </div>
             <div className="flex flex-wrap gap-1.5">
@@ -165,7 +173,7 @@ export function BotanicalCard({
                 onClick={() => setSpeciesOverride('auto')}
                 className={chip(speciesOverride === 'auto', 'bg-leaf-light border-leaf text-leaf-dark')}
               >
-                自動（季節連動）
+                自動（開始日の季節）
               </button>
               {SPECIES_PRESETS.map((preset) => (
                 <button

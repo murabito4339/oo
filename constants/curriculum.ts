@@ -137,6 +137,63 @@ export const NODE_TEMPLATE: NodeItem[] = [
 
 export const TOTAL_STEPS = NODE_TEMPLATE.length;
 
+// ---- 進捗 ----
+// 進捗は「完了したステップ番号の一覧」で持つ。旧パスから移ってきた人は、
+// 新設ノード（ストーリー・ミックス復習）だけが未完了の「穴」になることがあるため、
+// 「何ステップ目まで進んだか」の数だけでは表せない。
+
+/** 完了ステップを正規化（範囲外を除き、重複なし・昇順） */
+export function normalizeCompleted(steps: readonly number[]): number[] {
+  return [...new Set(steps)].filter((s) => Number.isInteger(s) && s >= 1 && s <= TOTAL_STEPS).sort((a, b) => a - b);
+}
+
+/** 次に取り組むノード（未完了のうち最初のもの）。全部終わっていれば null */
+export function nextNodeOf(completed: readonly number[]): NodeItem | null {
+  const done = new Set(completed);
+  return NODE_TEMPLATE.find((n) => !done.has(n.step)) ?? null;
+}
+
+export type NodeStatus = 'done' | 'current' | 'locked';
+
+export function nodeStatus(step: number, completed: readonly number[]): NodeStatus {
+  if (completed.includes(step)) return 'done';
+  return nextNodeOf(completed)?.step === step ? 'current' : 'locked';
+}
+
+/**
+ * 旧パス（8ステップ）の各ステップを終えていたら、新パスのどのステップを完了扱いにするか。
+ *
+ * 旧: 1 語彙セット / 2 受容インプット / 3 聴解 / 4 瞬間英作文 / 5 構成英作文 I /
+ *     6 構成英作文 II / 7 4/3/2音読 / 8 総合自由英作文
+ *
+ * 方針：中身が実質的に済んでいるノードだけを完了にし、新設したノードは完了にしない。
+ *  - 語彙セットで50語すべてに出会っている → 出会う A・B
+ *  - 受容インプット（英→日の想起ドリル）→ 思い出す A・B
+ *  - 聴解は単語の音声練習で、ストーリー（文脈の中で聴く・読む）とは別物 → 対応なし
+ *  - 構成英作文は I と II の両方を終えたときだけ、統合後の構成英作文を完了
+ *  - ストーリーとミックス復習は新設なので、旧パスを修了した人にも残る
+ */
+const LEGACY_STEP_MAP: Record<number, number[]> = {
+  1: [1, 3],
+  2: [2, 4],
+  3: [],
+  4: [7],
+  5: [],
+  6: [8],
+  7: [9],
+  8: [10],
+};
+
+export const LEGACY_TOTAL_STEPS = 8;
+
+/** 旧パスで「何ステップ目まで終えたか」から、新パスの完了ステップを求める */
+export function migrateLegacyDoneCount(legacyDone: number): number[] {
+  const upTo = Math.max(0, Math.min(LEGACY_TOTAL_STEPS, Math.floor(legacyDone)));
+  const steps: number[] = [];
+  for (let s = 1; s <= upTo; s++) steps.push(...LEGACY_STEP_MAP[s]);
+  return normalizeCompleted(steps);
+}
+
 export const STRAND_META: Record<
   Strand,
   { label: string; short: string; desc: string }

@@ -8,20 +8,21 @@ import { getSpeciesConfig } from './species';
 import { TreeLayer } from './TreeLayer';
 import { buildSeagullPath } from './treeGeometry';
 import type { SeagullAgent, SpeciesId } from './types';
-import { clamp, getGrowthStageMeta, getSeasonFromDate, getTreeBaseX, tintForTime } from './utils';
+import { clamp, getGrowthStageMeta, getTreeBaseX, tintForTime } from './utils';
 
 type Props = {
   days: number;
   isWateredToday: boolean;
   simulatedDate?: Date | null;
-  speciesId?: SpeciesId | null;
+  /** 樹種。育て始めた季節で決まるので、表示中の日付からは決めない */
+  speciesId: SpeciesId;
 };
 
 export function RealisticBotanicalCanvas({
   days,
   isWateredToday,
   simulatedDate = null,
-  speciesId = null,
+  speciesId,
 }: Props) {
   const [now, setNow] = useState<Date | null>(null);
 
@@ -39,7 +40,7 @@ export function RealisticBotanicalCanvas({
     : null;
 
   const env = computeEnvironmentState(activeDate);
-  const resolvedSpeciesId: SpeciesId = speciesId ?? getSeasonFromDate(activeDate);
+  const resolvedSpeciesId: SpeciesId = speciesId;
   const species = getSpeciesConfig(resolvedSpeciesId);
   const growthMeta = getGrowthStageMeta(days, resolvedSpeciesId);
 
